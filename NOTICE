@@ -1,0 +1,13 @@
+This product includes software developed by Loukas Mousas.
+
+Third-party notices:
+
+- fluent-ffmpeg (MIT) — used to control system ffmpeg for audio transcoding.
+- gpt4all (MIT) — local LLM bindings.
+- @tensorflow/tfjs-node, @tensorflow-models/* (Apache-2.0 / MIT) — CPU inference.
+- @comunica/query-sparql (MIT) — SPARQL query engine.
+- sharp (Apache-2.0) — image processing.
+- socket.io (MIT) — real-time UI.
+- nodejs-whisper (MIT) — CLI/Binary wrapper for Whisper; models downloaded by the package.
+
+No FFmpeg binary is bundled with this project. Users install system ffmpeg under their OS package manager. If you redistribute with ffmpeg binaries, ensure compliance with FFmpeg and codec library licenses.

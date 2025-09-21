@@ -1,0 +1,2 @@
+{"utterance":"How many regions are in the image?","gold_sparql":"SELECT (COUNT(?r) AS ?count) WHERE { ?r a :Region . }","gold_answers":[{"count":"0"}]}
+{"utterance":"List all region class labels","gold_sparql":"SELECT ?label WHERE { ?r a :Region ; :classLabel ?label . }","gold_answers":[{"label":"person"}]}

@@ -1,0 +1,13 @@
+PREFIX ex: <http://example.org/>
+PREFIX xsd:<http://www.w3.org/2001/XMLSchema#>
+
+SELECT ?r ?conf ?bbox
+WHERE {
+  ?r a ex:person ;
+     ex:within <urn:image:USA_design> ;
+     ex:confidence ?conf ;
+     ex:x ?x ; ex:y ?y ; ex:w ?w ; ex:h ?h .
+  BIND (CONCAT("(",STR(?x),",",STR(?y),",",STR(?w),",",STR(?h),")") AS ?bbox)
+  FILTER(?conf > 0.7)
+}
+ORDER BY DESC(?conf)

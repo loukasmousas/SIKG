@@ -1,0 +1,14 @@
+PREFIX ex:   <http://example.org/>
+PREFIX rdf:  <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+PREFIX md:   <http://example.org/metadata#>
+SELECT ?s ?o WHERE {
+  ?stmt a rdf:Statement ;
+        rdf:subject ?s ;
+        rdf:predicate ?pred ;
+        rdf:object ?o .
+  OPTIONAL { ?stmt (md:relationshipName|rdfs:label) ?n . }
+  FILTER(BOUND(?n) && CONTAINS(LCASE(STR(?n)), "couple")) .
+  VALUES ?pred { md:near md:deletedNear md:contains md:deletedContains md:sameObjectAs md:deletedSameObjectAs }
+}
+LIMIT 50

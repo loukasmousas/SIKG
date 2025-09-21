@@ -1,0 +1,45 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  core:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Use Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+      - name: Install deps
+        run: npm ci --legacy-peer-deps
+      - name: Core CI Suite
+        run: npm run test:ci
+
+  extended:
+    if: github.event_name == 'push' || github.event.pull_request.head.repo.full_name != github.repository
+    needs: core
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Use Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+      - name: Install deps
+        run: npm ci --legacy-peer-deps
+      - name: Extended (non-fatal) Suite
+        run: |
+          set -e
+          npm run test:tiled-adaptive || echo "tiled-adaptive failed (non-fatal)"
+          npm run test:coco-override || echo "coco-override failed (non-fatal)"
+          npm run test:tile-vs-single || echo "tile-vs-single failed (non-fatal)"
+          npm run test:deeplab || echo "deeplab failed (non-fatal)"
+          npm run test:extract || echo "extract failed (non-fatal)"
+          npm run test:sparql || echo "sparql failed (non-fatal)"

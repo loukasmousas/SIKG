@@ -1,0 +1,8 @@
+[
+  {
+    "manifest": "output/LinkeIn_Profile_Pic_2.json",
+    "image": "input-images/LinkeIn Profile Pic 2.jpg",
+    "faces": [{ "x": 325, "y": 458, "w": 249, "h": 249 }],
+    "note": "Real face bbox derived from face-detection region in manifest (rounded)."
+  }
+]

@@ -1,0 +1,27 @@
+{
+  "manifests": ["Alte_Donau.json", "USA_design.json"],
+  "relations": [
+    { "subject": 2, "predicate": "contains", "object": 0 },
+    { "subject": 2, "predicate": "contains", "object": 1 },
+    { "subject": 1, "predicate": "overlaps", "object": 3 },
+    { "subject": 3, "predicate": "overlaps", "object": 1 },
+    { "subject": 1, "predicate": "near", "object": 3 },
+    { "subject": 3, "predicate": "near", "object": 1 },
+    { "subject": "region-2", "predicate": "near", "object": "region-3" },
+    { "subject": "region-3", "predicate": "near", "object": "region-2" },
+    { "subject": "region-2", "predicate": "overlaps", "object": "region-3" },
+    { "subject": "region-3", "predicate": "overlaps", "object": "region-2" },
+    { "subject": "region-8", "predicate": "near", "object": "region-9" },
+    { "subject": "region-9", "predicate": "near", "object": "region-8" },
+    { "subject": "region-8", "predicate": "overlaps", "object": "region-9" },
+    { "subject": "region-9", "predicate": "overlaps", "object": "region-8" },
+    { "subject": "region-12", "predicate": "near", "object": "region-52" },
+    { "subject": "region-52", "predicate": "near", "object": "region-12" },
+    { "subject": "region-12", "predicate": "overlaps", "object": "region-52" },
+    { "subject": "region-52", "predicate": "overlaps", "object": "region-12" },
+    { "subject": "region-13", "predicate": "near", "object": "region-14" },
+    { "subject": "region-14", "predicate": "near", "object": "region-13" },
+    { "subject": "region-13", "predicate": "overlaps", "object": "region-14" },
+    { "subject": "region-14", "predicate": "overlaps", "object": "region-13" }
+  ]
+}

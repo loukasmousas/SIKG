@@ -1,0 +1,2844 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Semantic Image KG Viewer</title>
+
+  <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <!-- ═════════ SIDEBAR ═════════ -->
+    <div id="side">
+      <h3>Gallery</h3>
+      <div id="thumbs">Loading…</div>
+    </div>
+
+    <!-- ═════════ MAIN ═════════ -->
+    <div id="main">
+      <!-- top bar -->
+      <div id="topBar">
+        <label
+          >JSON&nbsp;<input
+            id="jsonPath"
+            size="24"
+            value="output/imageData.json"
+        /></label>
+  <button id="loadBtn" class="btn-primary">Load</button><button id="saveBtn" class="btn-ok">Save</button>
+        <span style="margin-left: auto"></span>
+        <label
+          >Pick URI
+          <select id="uriDD">
+            <option>— None —</option>
+          </select></label
+        >
+        <label
+          >or manual
+          <input id="uriManual" placeholder="Search or paste URI…" size="28"
+        /></label>
+        <!-- Compact toggle group to avoid overlap -->
+        <div id="toggles">
+          <!-- Audit toggle: include deleted/merged in suggestions (grey-listed) -->
+          <label class="switch" title="Include deleted/merged regions in search suggestions for audit">
+            <input type="checkbox" id="showDeleted" />
+            <span class="slider"></span>
+            <span class="switch-label">show deleted</span>
+          </label>
+          <label class="switch" title="Apply face blurring when available (privacy)">
+            <input type="checkbox" id="toggleBlur" checked />
+            <span class="slider"></span>
+            <span class="switch-label">blur faces</span>
+          </label>
+        </div>
+        <!-- Settings panel toggle -->
+  <button id="settingsBtn" title="Settings" class="btn-primary">⚙</button>
+        <a href="/global.html" class="btn-ghost" title="Open Global Registry" style="text-decoration:none;">Go to Global Registry</a>
+        <!-- Note to explain gaps in numeric IDs -->
+        <span
+          style="font-size: 11px; color: #666"
+          title="Confidence filtering, merges, and deletes create gaps"
+        >
+          IDs are sparse by design (filtered/merged/deleted).
+        </span>
+        <!-- 🎤 voice search -->
+  <button id="recBtn" title="Press and ask" class="btn-primary">
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            width="16"
+            height="16"
+            fill="currentColor"
+            class="bi bi-mic"
+            viewBox="0 0 16 16"
+          >
+            <path d="M8 1a2 2 0 0 0-2 2v6a2 2 0 0 0 4 0V3a2 2 0 0 0-2-2z" />
+            <path d="M11 6a3 3 0 0 1-6 0 3 3 0 0 1 6 0z" />
+            <path d="M8 13a4 4 0 0 1-4-4h1a3 3 0 0 0 6 0h1a4 4 0 0 1-4 4z" />
+          </svg>
+        </button>
+      </div>
+
+      <!-- canvases -->
+      <div id="canvasContainer">
+        <canvas id="mainCanvas"></canvas><canvas id="overlayCanvas"></canvas>
+        <div id="tip"></div>
+      </div>
+
+      <!-- SPARQL / confidence -->
+      <div id="bar">
+        <div id="confBlock">
+          conf ≥
+          <input
+            id="thr"
+            type="range"
+            min="0"
+            max="100"
+            step="1"
+            value="50"
+          />
+          <span id="thrVal">50&nbsp;%</span>
+        </div>
+        <div id="queryGroup">
+          <div id="queryTabs">
+            <button id="tabSparql" class="tab active" title="Write or paste SPARQL">Sparql</button>
+            <button id="tabChat" class="tab" title="Ask in natural language">Chat</button>
+          </div>
+          <button id="queryPopBtn" class="btn-ghost btn-sm" title="Open editor in a popup">↗</button>
+          <textarea id="q" placeholder="SPARQL  query…"></textarea>
+          <textarea id="chat" placeholder="Ask in natural language…" style="display:none"></textarea>
+          <div class="queryActions">
+            <button id="run" class="btn-primary">Run</button>
+            <button id="clearSparql" class="btn-ghost" title="Clear query, results, and highlights">Clear</button>
+          </div>
+        </div>
+        <div id="resPane">
+          <div id="resToolbar" title="Results options">
+            <button id="resPopBtn" class="btn-ghost btn-sm" title="Open results in a popup">↗</button>
+          </div>
+          <div id="res"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- region-editor popup -->
+    <div id="regionEditor">
+      <h3
+        style="
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 8px;
+        "
+      >
+        <span>Edit Region</span>
+        <span>
+          <button id="eSnap" title="Snap editor to a corner" class="btn-primary" style="font-size: 12px; padding: 2px 6px">
+            ↗
+          </button>
+        </span>
+      </h3>
+      <div style="margin-bottom: 6px">
+        <div>
+          Region id:&nbsp;<span id="eUriId" style="font-weight: 600"></span>
+        </div>
+        <div>
+          URI&nbsp;<span id="eUri" style="font-family: monospace"></span>
+        </div>
+  <button id="eToggleDetails" class="btn-ghost" style="margin-top: 4px">Details</button>
+        <div
+          id="eDetails"
+          style="display: none; color: #666; font-size: 12px; margin-top: 4px"
+        >
+          <div>internal id:&nbsp;<span id="eId"></span></div>
+          <div style="margin-top: 6px">
+            <label title="Include soft-deleted relationships in the list">
+              <input type="checkbox" id="showDeletedRels" /> show deleted
+              relationships
+            </label>
+          </div>
+          <div
+            style="
+              margin-top: 6px;
+              display: flex;
+              align-items: center;
+              gap: 8px;
+            "
+          >
+            <label title="Relationships per page">
+              page size
+              <select id="relPageSizeSel">
+                <option value="25">25</option>
+                <option value="50" selected>50</option>
+                <option value="100">100</option>
+              </select>
+            </label>
+            <label title="Filter by predicate">
+              predicate
+              <select id="relPredicateFilter">
+                <option value="all" selected>all</option>
+                <option value="near">near</option>
+                <option value="contains">contains</option>
+                <option value="sameObjectAs">sameObjectAs</option>
+              </select>
+            </label>
+            <label title="Quick filter by URI substring or relationship name">
+              filter
+              <input
+                id="relQuickFilter"
+                placeholder="other URI or name…"
+                size="18"
+              />
+            </label>
+            <button id="relClearFilters" title="Clear filters" class="btn-primary" style="padding: 2px 6px">
+              Clear
+            </button>
+          </div>
+          <div id="eRelInfo" style="margin-top: 6px"></div>
+        </div>
+        <input id="eIdHidden" type="hidden" />
+      </div>
+      <label>Tags&nbsp;<input id="eTags" style="width: 100%" /></label><br />
+      <label
+        >Relationship&nbsp;<select id="eRel">
+          <option value="near">near</option>
+          <option value="contains">contains</option>
+          <option value="sameObjectAs">sameObjectAs</option>
+        </select></label
+      ><br />
+      <label
+        >URI&nbsp;A:<input
+          id="eA"
+          placeholder="Search or paste URI…"
+          style="width: 100%" /></label
+      ><br />
+      <label
+        >URI&nbsp;B:<input
+          id="eB"
+          placeholder="Search or paste URI…"
+          style="width: 100%" /></label
+      ><br />
+      <label
+        title="Optional human-friendly name for this relationship (stored in RDF)"
+        >Named Relationship&nbsp;<input
+          id="eRelName"
+          placeholder="e.g., owner, part-of, sibling"
+          style="width: 100%" /></label
+      ><br />
+      <label
+        title="Optional free-text description for this relationship (stored in RDF)"
+        >Description&nbsp;<input
+          id="eRelDesc"
+          placeholder="Optional description…"
+          style="width: 100%" /></label
+      ><br />
+  <button id="eSave" class="btn-ok">Save</button><button id="eDel" class="btn-danger">Delete</button
+  ><button id="eCancel" class="btn-ghost">Cancel</button>
+    </div>
+    <!-- results popup -->
+    <div id="resultsPopup" style="display:none">
+      <h3 style="display:flex;align-items:center;justify-content:space-between;margin:0 0 8px">
+        <span>Results</span>
+        <span style="display:flex;gap:6px;align-items:center">
+          <label style="font-weight:normal;display:inline-flex;align-items:center;gap:6px;color:var(--muted)">
+            <input type="checkbox" id="resDetailsPop" /> Details
+          </label>
+          <button id="resFit" class="btn-ghost btn-sm" title="Fit to content">Fit</button>
+          <button id="resSnap" class="btn-primary btn-sm" title="Snap to a corner">↗</button>
+          <button id="resPopClose" class="btn-ghost btn-sm" title="Close">✕</button>
+        </span>
+      </h3>
+      <div id="resPopupBody"></div>
+  <div id="resizer" class="resizer" title="Resize"></div>
+    </div>
+    <!-- editor popup (movable/resizable) -->
+    <div id="editorPopup" style="display:none">
+      <h3>
+        <span>Query Editor</span>
+        <span style="display:flex;gap:6px;align-items:center">
+          <button id="editorSnap" class="btn-primary btn-sm" title="Snap to a corner">↗</button>
+          <button id="editorClose" class="btn-ghost btn-sm" title="Close">✕</button>
+        </span>
+      </h3>
+      <div class="editor-body">
+        <div style="display:flex;gap:6px;align-items:center;padding-bottom:6px">
+          <button id="tabSparqlPop" class="tab active" title="Write or paste SPARQL">Sparql</button>
+          <button id="tabChatPop" class="tab" title="Ask in natural language">Chat</button>
+        </div>
+        <textarea id="qPop" placeholder="SPARQL  query…"></textarea>
+        <textarea id="chatPop" placeholder="Ask in natural language…" style="display:none"></textarea>
+        <div class="queryActionsPop">
+          <button id="runPop" class="btn-primary">Run</button>
+          <button id="clearPop" class="btn-ghost" title="Clear text">Clear</button>
+        </div>
+      </div>
+      <div id="editorResizer" class="resizer" title="Resize"></div>
+    </div>
+    <!-- global datalist for URI suggestions -->
+    <datalist id="uriSugg"></datalist>
+    <!-- simple settings panel -->
+    <div id="settingsPanel">
+      <div style="font-weight: 600; margin-bottom: 6px">Settings</div>
+      <label title="Choose color theme (applies immediately)" style="display:flex;align-items:center;gap:8px">
+        ☀ Theme
+        <span id="themePreview" class="theme-chip" title="Preview"></span>
+        <select id="settingsTheme" style="flex:0 0 auto">
+          <option value="system">System</option>
+          <option value="light">Light</option>
+          <option value="dark">Dark</option>
+        </select>
+      </label>
+      <div style="height: 8px"></div>
+      <label title="Accent color for highlights and primary buttons" style="display:flex;align-items:center;gap:8px;margin-top:8px">
+        🎨 Accent
+        <input type="color" id="settingsAccent" value="#4f8cff"/>
+      </label>
+      <div style="height: 8px"></div>
+      <div style="font-weight: 600; margin: 8px 0 4px">Privacy</div>
+      <label class="switch" title="Apply face blurring when available (privacy)">
+        <input type="checkbox" id="settingsBlur" />
+        <span class="slider"></span>
+        <span class="switch-label">Blur faces</span>
+      </label>
+      <label
+        title="Default page size used for relationship list (can be changed per session in Details)"
+      >
+        Relationship page size (default)
+        <select id="settingsRelPageDefault">
+          <option value="25">25</option>
+          <option value="50">50</option>
+          <option value="100">100</option>
+        </select>
+      </label>
+      <div
+        style="
+          margin-top: 8px;
+          display: flex;
+          gap: 6px;
+          justify-content: flex-end;
+        "
+      >
+  <button id="settingsSave" class="btn-ok">Save</button>
+  <button id="settingsCancel" class="btn-ghost">Close</button>
+      </div>
+    </div>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script>
+      /* ───── handles & globals ───── */
+      let sock;
+      try {
+        sock = io();
+      } catch (e) {
+        console.warn('socket.io unavailable; continuing in offline mode');
+        sock = { on: () => {}, emit: () => {} };
+      }
+      // Explicit element refs (avoid relying on implicit window globals by id)
+      const jsonPath = document.getElementById('jsonPath');
+      const loadBtn = document.getElementById('loadBtn');
+      const saveBtn = document.getElementById('saveBtn');
+      const uriDD = document.getElementById('uriDD');
+      const uriManual = document.getElementById('uriManual');
+      const settingsBtn = document.getElementById('settingsBtn');
+      const settingsPanel = document.getElementById('settingsPanel');
+      const settingsRelPageDefault = document.getElementById(
+        'settingsRelPageDefault',
+      );
+  const settingsTheme = document.getElementById('settingsTheme');
+  const settingsSave = document.getElementById('settingsSave');
+      const settingsCancel = document.getElementById('settingsCancel');
+  const themePreview = document.getElementById('themePreview');
+  const settingsAccent = document.getElementById('settingsAccent');
+      const run = document.getElementById('run');
+      const q = document.getElementById('q');
+      const res = document.getElementById('res');
+  const resToolbar = document.getElementById('resToolbar');
+  const resPopBtn = document.getElementById('resPopBtn');
+  const resultsPopup = document.getElementById('resultsPopup');
+  const resPopClose = document.getElementById('resPopClose');
+  const resSnap = document.getElementById('resSnap');
+  const resFit = document.getElementById('resFit');
+  const resPopupBody = document.getElementById('resPopupBody');
+  const resDetailsPop = document.getElementById('resDetailsPop');
+  const thr = document.getElementById('thr');
+      const main = document.getElementById('mainCanvas'),
+        over = document.getElementById('overlayCanvas');
+      const mc = main.getContext('2d'),
+        oc = over.getContext('2d'),
+        cont = document.getElementById('canvasContainer');
+      const tip = document.getElementById('tip'),
+        thrVal = document.getElementById('thrVal');
+      // Query editors and tabs
+      const tabSparql = document.getElementById('tabSparql');
+      const tabChat = document.getElementById('tabChat');
+      const chatBox = document.getElementById('chat');
+      // Editor popup handles
+      const queryPopBtn = document.getElementById('queryPopBtn');
+      const editorPopup = document.getElementById('editorPopup');
+      const tabSparqlPop = document.getElementById('tabSparqlPop');
+      const tabChatPop = document.getElementById('tabChatPop');
+      const qPop = document.getElementById('qPop');
+      const chatPop = document.getElementById('chatPop');
+      const editorClose = document.getElementById('editorClose');
+      const editorSnap = document.getElementById('editorSnap');
+      const runPop = document.getElementById('runPop');
+      const clearPop = document.getElementById('clearPop');
+      let activeTab = 'sparql';
+      function setTab(name){
+        activeTab = name === 'chat' ? 'chat' : 'sparql';
+        tabSparql.classList.toggle('active', activeTab==='sparql');
+        tabChat.classList.toggle('active', activeTab==='chat');
+        document.getElementById('q').style.display = activeTab==='sparql' ? 'block' : 'none';
+        chatBox.style.display = activeTab==='chat' ? 'block' : 'none';
+      }
+      tabSparql?.addEventListener('click', ()=> setTab('sparql'));
+      tabChat?.addEventListener('click', ()=> setTab('chat'));
+  const settingsBlur = document.getElementById('settingsBlur');
+
+      // Popup editor wiring
+      function setTabPop(name){
+        const t = name === 'chat' ? 'chat' : 'sparql';
+        tabSparqlPop.classList.toggle('active', t==='sparql');
+        tabChatPop.classList.toggle('active', t==='chat');
+        qPop.style.display = t==='sparql' ? 'block' : 'none';
+        chatPop.style.display = t==='chat' ? 'block' : 'none';
+      }
+      tabSparqlPop?.addEventListener('click', ()=> setTabPop('sparql'));
+      tabChatPop?.addEventListener('click', ()=> setTabPop('chat'));
+      queryPopBtn?.addEventListener('click', () => {
+        if (!editorPopup) return;
+        setTabPop(activeTab);
+        qPop.value = q.value;
+        chatPop.value = chatBox.value;
+        editorPopup.style.display = 'block';
+        editorPopup.style.top = '56px';
+        editorPopup.style.left = '12px';
+        editorPopup.style.right = 'auto';
+        editorPopup.style.bottom = 'auto';
+      });
+      editorClose?.addEventListener('click', () => { if (editorPopup) editorPopup.style.display = 'none'; });
+      let editorSnapPos = 0;
+      editorSnap?.addEventListener('click', () => {
+        if (!editorPopup) return;
+        const off = '12px';
+        editorPopup.style.left = 'auto';
+        editorPopup.style.top = 'auto';
+        editorPopup.style.right = 'auto';
+        editorPopup.style.bottom = 'auto';
+        if (editorSnapPos === 0) { editorPopup.style.top = '56px'; editorPopup.style.right = off; }
+        else if (editorSnapPos === 1) { editorPopup.style.bottom = off; editorPopup.style.right = off; }
+        else if (editorSnapPos === 2) { editorPopup.style.bottom = off; editorPopup.style.left = off; }
+        else { editorPopup.style.top = '56px'; editorPopup.style.left = off; }
+        editorSnapPos = (editorSnapPos + 1) % 4;
+      });
+
+      /* editor handles */
+      const regionEd = document.getElementById('regionEditor'),
+        eId = document.getElementById('eId');
+      const eIdHidden = document.getElementById('eIdHidden'),
+        eUri = document.getElementById('eUri'),
+        eUriId = document.getElementById('eUriId');
+      const eToggleDetails = document.getElementById('eToggleDetails'),
+        eDetails = document.getElementById('eDetails');
+      // Audit toggle checkbox (when on, suggestions also include deleted/merged items)
+      const showDeleted = document.getElementById('showDeleted');
+      const eTags = document.getElementById('eTags'),
+        eRel = document.getElementById('eRel');
+      const eA = document.getElementById('eA'),
+        eB = document.getElementById('eB');
+      const eRelName = document.getElementById('eRelName');
+      const eRelDesc = document.getElementById('eRelDesc');
+
+      /* state */
+      let imgW = 0,
+        imgH = 0,
+        scale = 1,
+        isTiled = false,
+        tileM = [],
+        regs = [],
+        nextManual = 101,
+        conf = 0.5;
+  let showResDetails = false; // controls extra result columns (popup only)
+  let lastResultRows = null;  // cache last rows to re-render on toggle
+  let pendingDeletedOverlay = null; // persistent overlay when highlighting deleted not in regs
+  let currentHighlightBoxes = []; // persist SPARQL highlight boxes across redraws
+
+      // Settings: default relationship page size, used when no per-user override is stored.
+      const DEFAULT_REL_PAGE_SIZE =
+        parseInt(localStorage.getItem('settings.relPageDefault') || '50', 10) ||
+        50;
+      // Relationship list cache + pagination state (declare early for users below)
+      const relationshipCache = Object.create(null);
+      const relPageState = Object.create(null); // uri -> page number
+      let relPageSize =
+        parseInt(
+          localStorage.getItem('relPageSize') || String(DEFAULT_REL_PAGE_SIZE),
+          10,
+        ) || DEFAULT_REL_PAGE_SIZE;
+
+      /* fetch helper */
+      const J = (u) => fetch(u).then((r) => r.json());
+
+      /* ───── build gallery ───── */
+      (async () => {
+        const box = document.getElementById('thumbs');
+        box.textContent = '';
+        try {
+          const arr = await J('/images.json');
+          if (!arr.length) {
+            box.textContent = '(no images)';
+            return;
+          }
+          arr.forEach((v) => {
+            const im = document.createElement('img');
+            im.src = v.thumb;
+            im.title = v.id;
+            im.onclick = () => {
+              // Prefer server-provided jsonPath (absolute path) if present
+              if (v.jsonPath) {
+                jsonPath.value = v.jsonPath; // already like /output/<name>.json
+              } else if (v.base) {
+                // Try original base name first (handles spaces)
+                jsonPath.value = `/output/${v.base}.json`;
+              } else {
+                // Fallback to id-based convention
+                jsonPath.value = `/output/${v.id}.json`;
+              }
+              loadJSON();
+            };
+            box.appendChild(im);
+          });
+        } catch (e) {
+          box.textContent = '(gallery load failed)';
+          console.error(e);
+          // keep page functional even if gallery fails
+          // user can paste a JSON path and click Load
+        }
+      })();
+      // Keyboard nudge: when editor is visible, Alt+Arrow keys move it (Shift for x5)
+      window.addEventListener('keydown', (e) => {
+        if (regionEd.style.display !== 'block') return;
+        if (!e.altKey) return; // require Alt to avoid hijacking caret navigation
+        const step = e.shiftKey ? 50 : 10;
+        let moved = false;
+        const left = parseInt(regionEd.style.left || '0', 10) || 0;
+        const top = parseInt(regionEd.style.top || '0', 10) || 0;
+        if (e.key === 'ArrowLeft') {
+          regionEd.style.left = Math.max(0, left - step) + 'px';
+          moved = true;
+        } else if (e.key === 'ArrowRight') {
+          regionEd.style.left = Math.max(0, left + step) + 'px';
+          moved = true;
+        } else if (e.key === 'ArrowUp') {
+          regionEd.style.top = Math.max(0, top - step) + 'px';
+          moved = true;
+        } else if (e.key === 'ArrowDown') {
+          regionEd.style.top = Math.max(0, top + step) + 'px';
+          moved = true;
+        }
+        if (moved) {
+          const rect = regionEd.getBoundingClientRect();
+          lastEditorPos = { left: rect.left, top: rect.top };
+          e.preventDefault();
+        }
+      });
+
+      // Page size selector wiring
+      (function wirePageSizeSelector() {
+        const sel = document.getElementById('relPageSizeSel');
+        if (!sel) return;
+        sel.value = String(relPageSize);
+        sel.addEventListener('change', () => {
+          relPageSize = parseInt(sel.value, 10) || 50;
+          localStorage.setItem('relPageSize', String(relPageSize));
+          const cur = document.getElementById('eUri')?.textContent;
+          if (cur && eDetails.style.display === 'block') {
+            relPageState[cur] = 1; // reset page on size change
+            renderRelationshipInfo(cur);
+          }
+        });
+      })();
+
+      // Snap-to-corner button: cycles TL -> TR -> BR -> BL
+      (function wireSnap() {
+        const btn = document.getElementById('eSnap');
+        if (!btn) return;
+        let mode = 0;
+        const corners = () => {
+          const m = 12; // margin
+          const vw = window.innerWidth,
+            vh = window.innerHeight;
+          return [
+            { left: m, top: m }, // TL
+            { left: vw - regionEd.offsetWidth - m, top: m }, // TR
+            {
+              left: vw - regionEd.offsetWidth - m,
+              top: vh - regionEd.offsetHeight - m,
+            }, // BR
+            { left: m, top: vh - regionEd.offsetHeight - m }, // BL
+          ];
+        };
+        btn.addEventListener('click', () => {
+          if (regionEd.style.display !== 'block') return;
+          mode = (mode + 1) % 4;
+          const c = corners()[mode];
+          regionEd.style.left = c.left + 'px';
+          regionEd.style.top = c.top + 'px';
+          lastEditorPos = { left: c.left, top: c.top };
+        });
+      })();
+
+      /* ───── confidence slider ───── */
+      thr.oninput = (e) => {
+        thrVal.textContent = e.target.value + ' %';
+        conf = +e.target.value / 100;
+        drawOverlay();
+      };
+
+      /* ───── load JSON + tiles ───── */
+      let uriMap = new Map(); // exact URI → region (active only)
+      function rebuildUriMap() {
+        uriMap = new Map();
+        regs
+          .filter((r) => !r.metadata?.deleted)
+          .forEach((r) => {
+            const u = (r.metadata?.uri || '').trim();
+            if (u) uriMap.set(u, r);
+          });
+      }
+      async function loadJSON() {
+        const path = jsonPath.value.trim();
+        if (!path) return;
+        let d;
+        try {
+          d = await J(`/loadImage?jsonPath=${encodeURIComponent(path)}`);
+        } catch (e) {
+          alert('Failed to load manifest: ' + e.message);
+          return;
+        }
+        isTiled = d.isTiled;
+        tileM = d.tileManifest;
+        regs = d.regions;
+        // When present, hold the full set (including deleted/merged) for audit
+        window._allRegions = Array.isArray(d.allRegions) ? d.allRegions : null;
+        window._mergedSources = Array.isArray(d.mergedSources)
+          ? d.mergedSources
+          : [];
+        // uriMap is module-scoped; don’t redeclare
+        imgW = d.width;
+        imgH = d.height;
+        nextManual =
+          Math.max(
+            100,
+            ...regs
+              .filter((r) => /^manual-/.test(r.id))
+              .map((r) => +r.id.split('-')[1]),
+          ) + 1;
+        rebuildUriMap();
+        fit();
+        await drawBitmap();
+        drawOverlay();
+        buildDD();
+      }
+      loadBtn.onclick = loadJSON;
+
+      /* scale to fit container */
+      function fit() {
+        const r = cont.getBoundingClientRect();
+        scale = Math.min(r.width / imgW, r.height / imgH, 1);
+        [main, over].forEach((c) => {
+          c.width = imgW;
+          c.height = imgH;
+          c.style.width = imgW * scale + 'px';
+          c.style.height = imgH * scale + 'px';
+        });
+        // If there is a pending read-only overlay (e.g., deleted region not in regs), draw it now
+        if (pendingDeletedOverlay && showDeleted?.checked) {
+          const { b, color } = pendingDeletedOverlay;
+          if (b) {
+            oc.save();
+            oc.setLineDash([6, 6]);
+            oc.strokeStyle = color || '#999';
+            oc.lineWidth = 2;
+            oc.strokeRect(b.x1, b.y1, b.x2 - b.x1, b.y2 - b.y1);
+            oc.restore();
+          }
+        }
+        // Draw persisted highlight boxes from the last SPARQL run on top (always visible, non-dimming)
+        if (Array.isArray(currentHighlightBoxes) && currentHighlightBoxes.length) {
+          oc.save();
+          oc.lineWidth = 2 / Math.max(1, scale);
+          currentHighlightBoxes.forEach((b) => {
+            if (b.deleted && !showDeleted?.checked) return; // respect toggle
+            oc.strokeStyle = b.deleted ? '#888' : 'yellow';
+            oc.setLineDash(b.deleted ? [4, 3] : []);
+            oc.strokeRect(b.x1, b.y1, b.x2 - b.x1, b.y2 - b.y1);
+          });
+          oc.setLineDash([]);
+          oc.restore();
+        }
+      }
+      onresize = (_) => imgW && fit() && drawBitmap() && drawOverlay();
+
+      /* draw bitmap or tiles */
+      const loadImg = (p) =>
+        new Promise((ok, err) => {
+          const i = new Image();
+          i.onload = (_) => ok(i);
+          i.onerror = err;
+          i.src = p;
+        });
+      const toggleBlur = document.getElementById('toggleBlur');
+      // Sync blur preference between top bar and settings; persist
+        function applyBlurPref(on) {
+        if (toggleBlur) toggleBlur.checked = !!on;
+        if (settingsBlur) settingsBlur.checked = !!on;
+        try { localStorage.setItem('settings.blur', on ? '1' : '0'); } catch (err) { console.warn('localStorage set blur', err); }
+        if (imgW) drawBitmap();
+        try { logEvent('blur_pref', { on: !!on }); } catch (err) { console.warn('logEvent blur_pref', err); }
+      }
+      // initialize from storage (default on)
+        (function initBlurPref(){
+        let v = null;
+        try { v = localStorage.getItem('settings.blur'); } catch (err) { console.warn('localStorage get blur', err); }
+        applyBlurPref(v == null ? true : v === '1');
+      })();
+      toggleBlur?.addEventListener('change', () => applyBlurPref(toggleBlur.checked));
+      settingsBlur?.addEventListener('change', () => applyBlurPref(settingsBlur.checked));
+      async function drawBitmap() {
+        mc.clearRect(0, 0, imgW, imgH);
+        if (isTiled) {
+          for (let i = 0; i < tileM.length; i++) {
+            const t = tileM[i];
+            const qp = toggleBlur?.checked ? `&blur=1` : `&blur=0`;
+            mc.drawImage(await loadImg(`/getTile?index=${i}${qp}`), t.x, t.y);
+          }
+        } else {
+          const qp = toggleBlur?.checked ? `?blur=1` : `?blur=0`;
+          mc.drawImage(await loadImg(`/getTile${qp}`), 0, 0);
+        }
+      }
+
+      /* helpers for label / confidence */
+      const normalizeUri = (s) => {
+        if (s == null) return '';
+        let v = String(s).trim();
+        if ((v.startsWith('<') && v.endsWith('>')) || (v.startsWith('"') && v.endsWith('"'))) v = v.slice(1, -1).trim();
+        return v;
+      };
+      const getLabel = (r) => {
+        if (Array.isArray(r.tags) && r.tags.length) return r.tags[0];
+        if (r.metadata?.label) return r.metadata.label;
+        if (r.metadata?.description) return r.metadata.description;
+        return 'region';
+      };
+      const getConfidence = (r) => {
+        if (r.confidence ?? false) return r.confidence;
+        if (r.conf ?? false) return r.conf;
+        if (r.metadata?.confidence ?? false) return r.metadata.confidence;
+        if (r.metadata?.conf ?? false) return r.metadata.conf;
+        if (r.metadata) {
+          for (const v of Object.values(r.metadata)) {
+            if (typeof v === 'number' && v >= 0 && v <= 1) return v;
+          }
+        }
+        return undefined;
+      };
+
+      /* overlay drawing */
+      // function drawOverlay(hi=null){
+      //   oc.clearRect(0,0,imgW,imgH);
+      //   regs.forEach(r=>{
+      //     if(r.metadata?.deleted) return;
+      //     if(getConfidence(r)!=null && getConfidence(r)<conf) return;
+      //     const b=r.boundary;
+      //     oc.strokeStyle=r.tags?.includes('person')?'red':'blue';
+      //     oc.lineWidth=2; oc.fillStyle='transparent';
+      //     if(hi&&r.metadata.uri===hi){oc.strokeStyle='yellow';oc.lineWidth=4;oc.fillStyle='rgba(255,255,0,.25)';}
+      //     oc.fillRect(b.x1,b.y1,b.x2-b.x1,b.y2-b.y1);
+      //     oc.strokeRect(b.x1,b.y1,b.x2-b.x1,b.y2-b.y1);
+      //   });
+      // }
+
+  /* overlay drawing */
+  function drawOverlay(hi = null) {
+    oc.clearRect(0, 0, imgW, imgH);
+
+  regs.forEach((r) => {
+          if (r.metadata?.deleted && !showDeleted?.checked) return;
+          // Do not hide selected/highlighted regions due to confidence filtering
+          const selected = (hi && r.metadata.uri === hi) || r._hl;
+          if (!selected && getConfidence(r) != null && getConfidence(r) < conf) return;
+
+          const b = r.boundary;
+
+          // base style: deleted regions stay grey/dashed when visible; active use red/blue
+          if (r.metadata?.deleted) {
+            oc.strokeStyle = '#888';
+            oc.lineWidth = 2;
+            oc.setLineDash([4, 3]);
+            oc.fillStyle = 'transparent';
+          } else {
+            oc.strokeStyle = r.tags?.includes('person') ? 'red' : 'blue';
+            oc.lineWidth = 2;
+            oc.setLineDash([]);
+            oc.fillStyle = 'transparent';
+          }
+
+          // highlight by explicit param or selection flag
+          if ((hi && r.metadata.uri === hi) || r._hl) {
+            if (r.metadata?.deleted) {
+              // keep grey styling, emphasize slightly
+              oc.lineWidth = 3;
+              oc.setLineDash([4, 3]);
+              oc.fillStyle = 'rgba(128,128,128,0.2)';
+            } else {
+              oc.strokeStyle = 'yellow';
+              oc.lineWidth = 4;
+              oc.setLineDash([]);
+              oc.fillStyle = 'rgba(255,255,0,.25)';
+            }
+          } else {
+            // subtle hover cue only for active (non-deleted) regions; don't mask selected deleted
+            if (!r.metadata?.deleted && lastMouse) {
+              const { x, y } = lastMouse;
+              if (x >= b.x1 && x <= b.x2 && y >= b.y1 && y <= b.y2) {
+                oc.save();
+                oc.globalAlpha = 0.12;
+                oc.fillStyle = '#4f8cff';
+                oc.fillRect(b.x1, b.y1, b.x2 - b.x1, b.y2 - b.y1);
+                oc.restore();
+              }
+            }
+          }
+
+          oc.fillRect(b.x1, b.y1, b.x2 - b.x1, b.y2 - b.y1);
+          oc.strokeRect(b.x1, b.y1, b.x2 - b.x1, b.y2 - b.y1);
+        });
+
+        // Persist a read-only deleted overlay (for URIs not present in regs) as part of the main overlay
+        if (pendingDeletedOverlay && showDeleted?.checked) {
+          const { b, color } = pendingDeletedOverlay || {};
+          if (b) {
+            oc.save();
+            oc.setLineDash([4, 3]);
+            oc.strokeStyle = color || '#999';
+            oc.lineWidth = 2;
+            oc.strokeRect(b.x1, b.y1, b.x2 - b.x1, b.y2 - b.y1);
+            oc.restore();
+          }
+        }
+
+        // Also draw any persisted SPARQL highlight boxes on top so mouse moves won't clear them
+        if (Array.isArray(currentHighlightBoxes) && currentHighlightBoxes.length) {
+          oc.save();
+          oc.lineWidth = 2 / Math.max(1, scale);
+          currentHighlightBoxes.forEach((b) => {
+            if (b.deleted && !showDeleted?.checked) return; // respect toggle
+            oc.strokeStyle = b.deleted ? '#888' : 'yellow';
+            oc.setLineDash(b.deleted ? [4, 3] : []);
+            oc.strokeRect(b.x1, b.y1, b.x2 - b.x1, b.y2 - b.y1);
+          });
+          oc.setLineDash([]);
+          oc.restore();
+        }
+      }
+
+      /* hover tooltip – always active, even when editor is open */
+      let lastMouse = null;
+      over.addEventListener('mousemove', (e) => {
+        const rect = over.getBoundingClientRect();
+        const ox = (e.clientX - rect.left) / scale;
+        const oy = (e.clientY - rect.top) / scale;
+        lastMouse = { x: ox, y: oy };
+        const hit = regs.find(
+          (r) =>
+            !r.metadata?.deleted &&
+            ox >= r.boundary.x1 &&
+            ox <= r.boundary.x2 &&
+            oy >= r.boundary.y1 &&
+            oy <= r.boundary.y2,
+        );
+        if (hit) {
+          const c = getConfidence(hit);
+          tip.textContent = `${getLabel(hit)}${c != null ? ` (${(+c).toFixed(2)})` : ''}`;
+          // Position tooltip relative to the canvas container so it appears
+          // close to and to the right of the cursor inside the scrolled area.
+          const cR = cont.getBoundingClientRect();
+          const left = e.clientX - cR.left + cont.scrollLeft + 10; // right of cursor
+          const top = e.clientY - cR.top + cont.scrollTop + 8;     // slight vertical offset
+          tip.style.left = left + 'px';
+          tip.style.top = top + 'px';
+          tip.style.display = 'block';
+        } else {
+          tip.style.display = 'none';
+        }
+        // update subtle hover highlight
+  drawOverlay();
+      });
+      over.addEventListener('mouseleave', () => {
+        tip.style.display = 'none';
+        lastMouse = null;
+        drawOverlay();
+      });
+
+      /* save */
+        saveBtn.onclick = async () => {
+        const t0 = performance.now();
+        try { logEvent('save_start'); } catch (err) { console.warn('logEvent save_start', err); }
+        const resp = await J('/saveChanges');
+        try { logEvent('save_end', { durationMs: performance.now() - t0 }); } catch (err) { console.warn('logEvent save_end', err); }
+        alert(resp.message);
+      };
+
+      // --- Usability instrumentation helper ---
+        function logEvent(type, detail = {}) {
+        try {
+          fetch('/ux/event', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ type, detail, ts: Date.now() })
+          }).catch(()=>{});
+        } catch (err) { console.warn('logEvent network', err); }
+      }
+
+      // Instrument query run button
+      run?.addEventListener('click', () => {
+        const start = performance.now();
+        logEvent('query_start');
+        setTimeout(()=>{ // defer; actual completion captured after SPARQL results broadcast
+          const handler = ({ rows }) => {
+            logEvent('query_end', { durationMs: performance.now()-start, rows: (rows||[]).length });
+            sock?.off?.('sparqlOk', handler);
+          };
+          sock?.on?.('sparqlOk', handler);
+        },0);
+      });
+      // Instrument chat end
+        sock?.on?.('chatOk', ({ rows }) => {
+        try { logEvent('chat_end', { rows: Array.isArray(rows) ? rows.length : 0 }); } catch (err) { console.warn('logEvent chat_end', err); }
+      });
+
+      /* theme application (Settings) */
+      function applyTheme(mode) {
+        const m = mode || localStorage.getItem('settings.theme') || 'system';
+        if (m === 'system') {
+          const prefersLight =
+            window.matchMedia &&
+            window.matchMedia('(prefers-color-scheme: light)').matches;
+          document.body.classList.toggle('theme-light', !!prefersLight);
+        } else {
+          document.body.classList.toggle('theme-light', m === 'light');
+        }
+          try {
+            localStorage.setItem('settings.theme', m);
+          } catch (err) { console.warn('localStorage set theme', err); }
+        // update chip visual (no-op, CSS picks based on body class)
+        return m;
+      }
+
+      function hexShade(hex, amt) {
+        let col = hex.replace('#', '');
+        if (col.length === 3) col = col.split('').map((c) => c + c).join('');
+        const num = parseInt(col, 16);
+        let r = (num >> 16) + amt;
+        let g = ((num >> 8) & 0x00ff) + amt;
+        let b = (num & 0x0000ff) + amt;
+        r = Math.max(0, Math.min(255, r));
+        g = Math.max(0, Math.min(255, g));
+        b = Math.max(0, Math.min(255, b));
+        return `#${(1 << 24 | (r << 16) | (g << 8) | b).toString(16).slice(1)}`;
+      }
+      function applyAccent(hex) {
+        if (!/^#([0-9a-f]{3}|[0-9a-f]{6})$/i.test(hex)) return;
+        const dark = hexShade(hex, -25);
+        document.documentElement.style.setProperty('--accent', hex);
+        document.documentElement.style.setProperty('--accent-2', dark);
+          try { localStorage.setItem('settings.accent', hex); } catch (err) { console.warn('localStorage set accent', err); }
+      }
+      // initial
+      applyTheme();
+        try {
+          const curAccent = localStorage.getItem('settings.accent') || getComputedStyle(document.documentElement).getPropertyValue('--accent').trim() || '#4f8cff';
+          settingsAccent && (settingsAccent.value = curAccent);
+          applyAccent(curAccent);
+        } catch (err) { console.warn('localStorage get accent', err); }
+      // react to OS changes when in System mode
+        try {
+      const mql = window.matchMedia('(prefers-color-scheme: light)');
+      mql.addEventListener('change', () => {
+            if ((localStorage.getItem('settings.theme') || 'system') === 'system')
+      applyTheme('system');
+        });
+        } catch (err) { console.warn('matchMedia setup', err); }
+
+      /* URI dropdown */
+  function buildDD() {
+        uriDD.innerHTML = '<option>— None —</option>';
+        const activeUris = new Set();
+        regs
+          .filter((r) => !r.metadata?.deleted)
+          .forEach((r) => {
+            const o = document.createElement('option');
+            o.value = r.id;
+    const u = (r.metadata?.uri || '').trim();
+    const lab = getLabel(r);
+    o.textContent = `${lab} — ${u || r.id}`;
+    o.title = u || r.id; // show full URI on hover
+            uriDD.appendChild(o);
+    if (u) activeUris.add(u);
+          });
+
+        // When audit mode is on, append deleted regions as greyed entries (read-only selectable)
+        if (showDeleted?.checked) {
+          const source = Array.isArray(window._allRegions)
+            ? window._allRegions
+            : regs;
+          const deleted = source.filter((r) => !!r.metadata?.deleted);
+          if (deleted.length) {
+            const grp = document.createElement('optgroup');
+            grp.label = 'Deleted';
+            deleted.forEach((r) => {
+              const u = (r.metadata?.uri || '').trim();
+              if (u && activeUris.has(u)) return; // skip if active counterpart exists
+              const o = document.createElement('option');
+              const lab = getLabel(r);
+              o.value = '__deleted__:' + encodeURIComponent(u || r.id);
+              o.textContent = `${lab} — ${(u || r.id)} (deleted)`;
+              o.title = u || r.id;
+              // Try to grey visually while still selectable
+              o.style.color = '#777';
+              o.style.fontStyle = 'italic';
+              grp.appendChild(o);
+            });
+            if (grp.children.length) uriDD.appendChild(grp);
+          }
+        }
+        buildUriSuggestions();
+      }
+      uriDD.onchange = (_) => {
+        const id = uriDD.value;
+        if (id === '— None —') {
+          drawOverlay();
+          return;
+        }
+        if (id.startsWith('__deleted__:')) {
+          const uri = decodeURIComponent(id.replace('__deleted__:', ''));
+          // read-only resolve: pan/highlight without opening editor
+          resolveReadOnlyUri(uri);
+          // reset selection back to None to avoid implying editability
+          uriDD.value = '— None —';
+          return;
+        }
+        const r = regs.find((x) => x.id === id);
+        if (r) {
+          regs.forEach((z) => (z._hl = z.metadata?.uri === r.metadata?.uri));
+          drawOverlay();
+          openEd(r);
+        }
+      };
+      // manual top search: persist highlight on exact URI; fall back to read-only resolver for deleted/merged
+      uriManual.onkeyup = (e) => {
+        const v = e.target.value.trim();
+        if (!v) {
+          regs.forEach((z) => (z._hl = false));
+          return drawOverlay();
+        }
+        const r = regs.find((x) => x.metadata?.uri === v);
+        if (r) {
+          regs.forEach((z) => (z._hl = z.metadata?.uri === v));
+          return drawOverlay();
+        }
+        // If auditing and this looks like a deleted/merged-from URI, do read-only resolve
+        if (showDeleted?.checked) resolveReadOnlyUri(v, { openEditor: false });
+        else drawOverlay();
+      };
+
+      // Read-only resolver: pans/highlights a URI even if it's deleted/merged-from.
+      // If the URI is an active one, may open editor depending on options.
+      function resolveReadOnlyUri(uri, opts = {}) {
+        const { openEditor = false } = opts;
+        const active = regs.find(
+          (x) => !x.metadata?.deleted && x.metadata?.uri === uri,
+        );
+        if (active) {
+          pendingDeletedOverlay = null; // clear any pending read-only overlay
+          // Persist highlight so mouse moves won't clear it
+          regs.forEach((r) => (r._hl = r.metadata?.uri === uri));
+          drawOverlay();
+          focusRegion(active);
+          if (openEditor) openEd(active);
+          return;
+        }
+        // If merged-from, try resolve to target
+        const ms = Array.isArray(window._mergedSources)
+          ? window._mergedSources
+          : [];
+        const m = ms.find((x) => x.src === uri);
+        if (m) {
+          const target = regs.find(
+            (x) => !x.metadata?.deleted && x.metadata?.uri === m.target,
+          );
+          if (target) {
+            pendingDeletedOverlay = null;
+            regs.forEach((r) => (r._hl = r.metadata?.uri === m.target));
+            drawOverlay();
+            focusRegion(target);
+            return;
+          }
+        }
+        // If deleted region exists in full set, try to highlight its last known boundary if possible find same id in regs (may be deleted flag retained)
+        const source = Array.isArray(window._allRegions)
+          ? window._allRegions
+          : regs;
+        const delR = source.find((x) => x.metadata?.uri === uri);
+        if (delR && delR.boundary) {
+          // Prefer persistent highlight through drawOverlay if the deleted region exists in regs
+          const inRegs = regs.find((x) => x.metadata?.uri === uri && x.metadata?.deleted);
+          if (inRegs && showDeleted?.checked) {
+            regs.forEach((r) => (r._hl = r.metadata?.uri === uri));
+            pendingDeletedOverlay = null;
+            drawOverlay();
+            focusRegion(inRegs);
+            return;
+          }
+          // Fallback: store a persistent dashed rectangle to render after normal overlay
+          pendingDeletedOverlay = { b: delR.boundary, color: '#999' };
+          drawOverlay();
+          focusRegion({ boundary: delR.boundary });
+        } else {
+          // Fallback: just clear highlight
+          pendingDeletedOverlay = null;
+          drawOverlay();
+        }
+      }
+
+      /* autocomplete suggestions for relationship URIs */
+      function buildUriSuggestions() {
+        const dl = document.getElementById('uriSugg');
+        if (!dl) return;
+        dl.innerHTML = '';
+        const seen = new Set();
+        regs
+          .filter((r) => !r.metadata?.deleted)
+          .map((r) => r.metadata?.uri)
+          .filter((u) => typeof u === 'string' && u.length)
+          .forEach((u) => {
+            if (seen.has(u)) return;
+            const opt = document.createElement('option');
+            opt.value = u;
+            dl.appendChild(opt);
+            seen.add(u);
+          });
+      }
+
+      /* live highlight as user types in relationship fields */
+      const hookRelInput = (inp) => {
+        inp.addEventListener('input', (e) => {
+          const v = e.target.value.trim();
+          if (!v) {
+            regs.forEach((z) => (z._hl = false));
+            drawOverlay();
+            return;
+          }
+          const r = regs.find((x) => x.metadata?.uri === v);
+          if (r) {
+            regs.forEach((z) => (z._hl = z.metadata?.uri === v));
+            drawOverlay();
+          } else {
+            regs.forEach((z) => (z._hl = false));
+            drawOverlay();
+          }
+        });
+      };
+      hookRelInput(eA);
+      hookRelInput(eB);
+
+      /* ───── Enhanced autosuggest: fuzzy match + labels, with pan ───── */
+      function getCandidates() {
+        // Active (non-deleted) from uriMap
+        const out = [];
+        for (const [uri, r] of uriMap.entries()) {
+          const lastSeg = String(uri).split('/').pop() || String(r.id);
+          out.push({ uri, label: getLabel(r), id: lastSeg, r, deleted: false });
+        }
+        // Optionally include audit entries: deleted regions and merged sources
+        if (showDeleted?.checked) {
+          const seen = new Set([...uriMap.keys()]);
+          const source = Array.isArray(window._allRegions)
+            ? window._allRegions
+            : regs;
+          source.forEach((r) => {
+            const uri = (r.metadata?.uri || '').trim();
+            if (!uri || seen.has(uri)) return;
+            const lastSeg = String(uri).split('/').pop() || String(r.id);
+            const isDel = !!r.metadata?.deleted;
+            out.push({
+              uri,
+              label: getLabel(r),
+              id: lastSeg,
+              r,
+              deleted: isDel,
+            });
+            seen.add(uri);
+          });
+          // Add merged source URIs that point to targets; use minimal stub for label
+          if (Array.isArray(window._mergedSources)) {
+            window._mergedSources.forEach(({ src, target, targetId }) => {
+              if (!src || seen.has(src)) return;
+              const lastSeg = src.split('/').pop() || src;
+              const stub = {
+                id: targetId ? String(targetId) : lastSeg,
+                boundary: null,
+                tags: [],
+                metadata: { uri: target },
+              };
+              out.push({
+                uri: src,
+                label: 'merged-from',
+                id: lastSeg,
+                r: stub,
+                deleted: true,
+              });
+              seen.add(src);
+            });
+          }
+        }
+        return out;
+      }
+
+      (function setupAutosuggest() {
+        const escapeHtml = (s) =>
+          String(s).replace(
+            /[&<>"']/g,
+            (c) =>
+              ({
+                '&': '&amp;',
+                '<': '&lt;',
+                '>': '&gt;',
+                '"': '&quot;',
+                "'": '&#39;',
+              })[c],
+          );
+
+        // Remember the last input that had the autosuggest open/focused,
+        // so it can refresh when toggling audit mode.
+        let lastAutoInput = null;
+        // Track all suggestion boxes to ensure only one is visible at a time
+        const allBoxes = new Set();
+        const hideAllExcept = (keep) => {
+          allBoxes.forEach((b) => {
+            if (b !== keep) {
+              b.style.display = 'none';
+              b.innerHTML = '';
+            }
+          });
+        };
+
+        const attach = (inputEl) => {
+          // one suggestion box per input to avoid cross-talk
+          const box = document.createElement('div');
+          box.className = 'autosuggest-box';
+          box.style.position = 'absolute';
+          box.style.zIndex = 3000;
+          document.body.appendChild(box);
+          allBoxes.add(box);
+
+          let items = [];
+          let idx = -1;
+          const hide = () => {
+            box.style.display = 'none';
+            box.innerHTML = '';
+            idx = -1;
+          };
+          const place = () => {
+            const rect = inputEl.getBoundingClientRect();
+            box.style.left = rect.left + 'px';
+            box.style.top = rect.bottom + window.scrollY + 'px';
+            box.style.width = Math.max(rect.width, 480) + 'px';
+          };
+          const render = () => {
+            box.innerHTML = '';
+            items.forEach((it, i) => {
+              const row = document.createElement('div');
+              row.className = 'as-row' + (it.deleted ? ' deleted' : '');
+              row.onmouseenter = () => select(i);
+              // Grey-list audit-only rows but allow read-only navigation
+              if (it.deleted) {
+                row.style.cursor = 'pointer';
+                const pickDel = (e) => {
+                  e.preventDefault();
+                  inputEl.value = it.uri; // populate field
+                  // read-only resolution: pan/highlight, do not open editor
+                  resolveReadOnlyUri(it.uri, { openEditor: false });
+                  hide();
+                  inputEl.blur();
+                };
+                row.onclick = pickDel;
+                row.onmousedown = pickDel; // ensure selection before blur
+              } else {
+                const pickAct = (e) => {
+                  e.preventDefault();
+                  chooseItem(it);
+                };
+                row.onclick = pickAct;
+                row.onmousedown = pickAct; // ensure selection before blur
+              }
+              row.title = `${it.label} · ${it.uri}`;
+              row.innerHTML = `<div class="line"><strong class="label">${escapeHtml(it.label)}</strong> <span class="id">[${escapeHtml(it.id)}]${it.deleted ? ' · (deleted)' : ''}</span></div><div class="line uri">${escapeHtml(it.uri)}</div>`;
+              box.appendChild(row);
+            });
+            place();
+            hideAllExcept(items.length ? box : null);
+            box.style.display = items.length ? 'block' : 'none';
+            highlight();
+          };
+          const highlight = () => {
+            [...box.children].forEach((c, j) => {
+              c.style.background = j === idx ? 'var(--as-hl)' : 'transparent';
+            });
+          };
+          const select = (i) => {
+            idx = i;
+            highlight();
+          };
+          const chooseItem = ({ uri, r }) => {
+            inputEl.value = uri;
+            // resolve region by URI at pick time to avoid any stale references
+            const r2 = regs.find((x) => x.metadata?.uri === uri) || r;
+            // Persist highlight so mouse moves on canvas won't clear it
+            regs.forEach((z) => (z._hl = z.metadata?.uri === uri));
+            drawOverlay(uri);
+            focusRegion(r2);
+            if (inputEl.id === 'uriManual') {
+              // place editor near center of viewport when chosen from top search
+              const vx = window.innerWidth / 2;
+              const vy = window.innerHeight / 3;
+              openEd(r2, vx, vy);
+            }
+            hide();
+            inputEl.blur();
+          };
+          const update = () => {
+            const qRaw = inputEl.value.trim();
+            const q = qRaw.toLowerCase();
+            const all = getCandidates();
+            const isNum = /^\d+$/.test(qRaw);
+            const filtered = q
+              ? all.filter((x) => {
+                  const id = String(x.id).toLowerCase();
+                  const uriL = x.uri.toLowerCase();
+                  const labelL = (x.label || '').toLowerCase();
+                  const lastSeg = x.uri.split('/').pop()?.toLowerCase() || '';
+                  const tagsL = Array.isArray(x.r?.tags)
+                    ? x.r.tags.join(',').toLowerCase()
+                    : '';
+                  const descL = (
+                    x.r?.metadata?.description || ''
+                  ).toLowerCase();
+                  if (isNum) {
+                    // strict numeric search: match id numeric or last segment exactly/endswith
+                    const idNum = (id.match(/(\d+)/) || [])[1] || '';
+                    return (
+                      id === q ||
+                      idNum === qRaw ||
+                      lastSeg === q ||
+                      lastSeg.endsWith(q)
+                    );
+                  }
+                  return (
+                    uriL.includes(q) ||
+                    labelL.includes(q) ||
+                    id.includes(q) ||
+                    tagsL.includes(q) ||
+                    descL.includes(q)
+                  );
+                })
+              : all;
+            // sort by relevance: exact id match > last segment exact > id numeric equal > endswith > includes
+            const score = (x) => {
+              if (!q) return 999;
+              const id = String(x.id).toLowerCase();
+              const lastSeg =
+                String(x.uri).split('/').pop()?.toLowerCase() || '';
+              if (id === q) return 0;
+              if (lastSeg === q) return 0.5;
+              if (isNum) {
+                const num = (id.match(/(\d+)/) || [])[1] || '';
+                if (num === qRaw) return 1;
+                if (num.endsWith(qRaw)) return 2;
+              }
+              if (x.uri.toLowerCase().endsWith('/' + q)) return 3;
+              if (id.includes(q)) return 4;
+              if (x.uri.toLowerCase().includes(q)) return 5;
+              return 8;
+            };
+            items = filtered.sort((a, b) => score(a) - score(b));
+            items = items.slice(0, 12);
+            idx = items.length ? 0 : -1;
+            render();
+          };
+          inputEl.addEventListener('focus', () => {
+            lastAutoInput = inputEl;
+            update();
+          });
+          inputEl.addEventListener('input', () => {
+            lastAutoInput = inputEl;
+            update();
+          });
+          inputEl.addEventListener('keydown', (e) => {
+            if (box.style.display !== 'block') return;
+            if (e.key === 'ArrowDown') {
+              e.preventDefault();
+              if (items.length) select(Math.min(idx + 1, items.length - 1));
+            } else if (e.key === 'ArrowUp') {
+              e.preventDefault();
+              if (items.length) select(Math.max(idx - 1, 0));
+            } else if (e.key === 'Enter') {
+              if (idx >= 0) {
+                e.preventDefault();
+                // prefer exact match by id/last segment if present
+                const qRaw = inputEl.value.trim();
+                const q = qRaw.toLowerCase();
+                const isNum = /^\d+$/.test(qRaw);
+                const exact = items.find((x) => {
+                  const id = String(x.id).toLowerCase();
+                  const lastSeg =
+                    String(x.uri).split('/').pop()?.toLowerCase() || '';
+                  if (id === q || lastSeg === q) return true;
+                  if (isNum) {
+                    const num = (id.match(/(\d+)/) || [])[1] || '';
+                    if (num === qRaw) return true;
+                  }
+                  return false;
+                });
+                const pick = exact || items[idx];
+                if (pick?.deleted) {
+                  inputEl.value = pick.uri; // populate field
+                  resolveReadOnlyUri(pick.uri, { openEditor: false });
+                  hide();
+                  inputEl.blur();
+                } else {
+                  // Persist highlight for manual search too
+                  regs.forEach((z) => (z._hl = z.metadata?.uri === pick.uri));
+                  chooseItem(pick);
+                }
+              }
+            } else if (e.key === 'Escape') {
+              hide();
+            }
+          });
+          inputEl.addEventListener('blur', () => setTimeout(hide, 120));
+          window.addEventListener(
+            'scroll',
+            () => box.style.display === 'block' && place(),
+          );
+          window.addEventListener(
+            'resize',
+            () => box.style.display === 'block' && place(),
+          );
+        };
+
+        attach(document.getElementById('uriManual'));
+        attach(eA);
+        attach(eB);
+        // Refresh suggestions when toggling audit mode.
+        // If a field was active before, bring it back to focus and refresh.
+        showDeleted?.addEventListener('change', () => {
+          if (lastAutoInput) {
+            lastAutoInput.focus();
+            lastAutoInput.dispatchEvent(new Event('input', { bubbles: true }));
+          }
+          // Rebuild the Pick URI dropdown to reflect audit state
+          buildDD();
+        });
+      })();
+
+      /* draw new boxes */
+      let drawing = false,
+        sx = 0,
+        sy = 0,
+        drag = false;
+      over.onmousedown = (e) => {
+        const R = over.getBoundingClientRect();
+        sx = (e.clientX - R.left) / scale;
+        sy = (e.clientY - R.top) / scale;
+        drawing = true;
+        drag = false;
+      };
+      over.onmousemove = (e) => {
+        if (!drawing) return;
+        const R = over.getBoundingClientRect(),
+          cx = (e.clientX - R.left) / scale,
+          cy = (e.clientY - R.top) / scale;
+        if (!drag && (Math.abs(cx - sx) > 5 || Math.abs(cy - sy) > 5))
+          drag = true;
+        drawOverlay();
+        if (drag) {
+          oc.setLineDash([6, 4]);
+          oc.strokeStyle = 'lime';
+          oc.strokeRect(sx, sy, cx - sx, cy - sy);
+          oc.setLineDash([]);
+        }
+      };
+      over.onmouseup = (e) => {
+        if (!drawing) return;
+        drawing = false;
+        const R = over.getBoundingClientRect(),
+          ex = (e.clientX - R.left) / scale,
+          ey = (e.clientY - R.top) / scale;
+        if (!drag) {
+          const r = clickEdit(ex, ey, e.clientX, e.clientY);
+          return;
+        } /* CHANGED */
+        if (Math.abs(ex - sx) < 10 && Math.abs(ey - sy) < 10) return;
+        let id;
+        do {
+          id = `manual-${nextManual++}`;
+        } while (regs.some((r) => r.id === id));
+        const b = {
+          x1: Math.min(sx, ex),
+          y1: Math.min(sy, ey),
+          x2: Math.max(sx, ex),
+          y2: Math.max(sy, ey),
+        };
+        const uri = `uri://${imgName()}/manual-region/${id}`;
+        const reg = { id, boundary: b, tags: [], metadata: { uri } };
+        regs.push(reg);
+        uriMap.set(uri, reg);
+        sock.emit('updateRegion', {
+          regionId: id,
+          newTags: [],
+          newMeta: {},
+          boundary: b,
+          ontologyAction: null,
+        });
+        drawOverlay();
+        buildDD();
+        openEd(reg, e.clientX, e.clientY); /* CHANGED */
+      };
+      function clickEdit(x, y, px, py) {
+        const r = regs.find(
+          (z) =>
+            !z.metadata?.deleted &&
+            x >= z.boundary.x1 &&
+            x <= z.boundary.x2 &&
+            y >= z.boundary.y1 &&
+            y <= z.boundary.y2,
+        );
+        if (r) {
+          drawOverlay(r.metadata.uri);
+          openEd(r, px, py);
+        } else drawOverlay();
+        return r;
+      }
+      const imgName = (_) => {
+        const p = jsonPath.value.trim();
+        return p
+          ? p
+              .replace(/\.json$/, '')
+              .split(/[\\/]/)
+              .pop()
+          : 'myImage';
+      };
+
+      /* pan the scroll container to center a region (no zoom change) */
+      function focusRegion(r) {
+        if (!r || !r.boundary) return;
+        const b = r.boundary;
+        const rw = (b.x2 - b.x1) * scale;
+        const rh = (b.y2 - b.y1) * scale;
+        const cx = b.x1 * scale + rw / 2;
+        const cy = b.y1 * scale + rh / 2;
+        const left = Math.max(0, cx - cont.clientWidth / 2);
+        const top = Math.max(0, cy - cont.clientHeight / 2);
+        cont.scrollTo({ left, top, behavior: 'smooth' });
+      }
+
+      /* region editor – NEW positioning */
+      let lastEditorPos = null; // remember last position user placed the editor
+      function openEd(r, px = 24, py = 64) {
+        eId.textContent = r.id;
+        eIdHidden.value = r.id;
+        const uriStr = r.metadata?.uri || '';
+        eUri.textContent = uriStr;
+        eUriId.textContent = (uriStr.split('/').pop() || '').trim();
+        eTags.value = r.tags?.join(',') || '';
+        eRel.value = 'near';
+        eA.value = eB.value = '';
+        if (eRelName) eRelName.value = '';
+        if (eRelDesc) eRelDesc.value = '';
+        const baseLeft = lastEditorPos?.left ?? px + 12;
+        const baseTop = lastEditorPos?.top ?? py + 12;
+        regionEd.style.left = baseLeft + 'px';
+        regionEd.style.top = baseTop + 'px';
+        regionEd.style.display = 'block';
+        focusRegion(r);
+          try { logEvent('editor_open', { id: r.id, uri: uriStr, tagsCount: Array.isArray(r.tags)? r.tags.length : 0 }); } catch (err) { console.warn('logEvent editor_open', err); }
+        if (eDetails.style.display === 'block') renderRelationshipInfo(uriStr);
+      }
+      eToggleDetails.onclick = async (e) => {
+        e.preventDefault();
+        const nowOpen = eDetails.style.display === 'none';
+        eDetails.style.display = nowOpen ? 'block' : 'none';
+        if (nowOpen) {
+          const cur = document.getElementById('eUri')?.textContent;
+          if (cur) {
+            if (!relationshipCache[cur]) await ensureRelationships(cur);
+            renderRelationshipInfo(cur);
+          }
+        }
+      };
+      document
+        .getElementById('showDeletedRels')
+        ?.addEventListener('change', () => {
+          const cur = document.getElementById('eUri')?.textContent;
+          if (cur) renderRelationshipInfo(cur);
+        });
+      document
+        .getElementById('relPredicateFilter')
+        ?.addEventListener('change', () => {
+          const cur = document.getElementById('eUri')?.textContent;
+          if (cur) renderRelationshipInfo(cur);
+        });
+      document
+        .getElementById('relQuickFilter')
+        ?.addEventListener('input', () => {
+          const cur = document.getElementById('eUri')?.textContent;
+          if (cur) renderRelationshipInfo(cur);
+        });
+      document
+        .getElementById('relClearFilters')
+        ?.addEventListener('click', (e) => {
+          e.preventDefault();
+          const predSel = document.getElementById('relPredicateFilter');
+          const qf = document.getElementById('relQuickFilter');
+          if (predSel) predSel.value = 'all';
+          if (qf) qf.value = '';
+          const cur = document.getElementById('eUri')?.textContent;
+          if (cur) {
+            relPageState[cur] = 1; // reset paging too
+            renderRelationshipInfo(cur);
+          }
+        });
+
+      // ---- Relationship info in Details panel ----
+      function getCachedRelationships(uri) {
+        return relationshipCache[uri] || [];
+      }
+
+      const relFetchCtrls = new Map();
+      async function ensureRelationships(uri, force = false) {
+        if (!force && relationshipCache[uri]) return relationshipCache[uri];
+        const prev = relFetchCtrls.get(uri);
+        if (prev) prev.abort();
+        const ctrl = new AbortController();
+        relFetchCtrls.set(uri, ctrl);
+        try {
+          const rows = await fetch(
+            `/relationships?uri=${encodeURIComponent(uri)}`,
+            { signal: ctrl.signal },
+          ).then((r) => r.json());
+          const out = (Array.isArray(rows) ? rows : []).map((r) => ({
+            predicate: String(r.predicate || r.p || ''),
+            other: String(r.other || r.o || ''),
+            incoming: !!r.incoming,
+            deleted: !!r.deleted,
+            name: r.name ? String(r.name) : '',
+            description: r.description ? String(r.description) : '',
+            nameHistory: Array.isArray(r.nameHistory)
+              ? r.nameHistory.slice()
+              : [],
+            descriptionHistory: Array.isArray(r.descriptionHistory)
+              ? r.descriptionHistory.slice()
+              : [],
+          }));
+          relationshipCache[uri] = out;
+          if (
+            eDetails.style.display === 'block' &&
+            relFetchCtrls.get(uri) === ctrl
+          )
+            renderRelationshipInfo(uri);
+          return out;
+        } catch (e) {
+          if (e && e.name === 'AbortError') return relationshipCache[uri] || [];
+          return relationshipCache[uri] || [];
+        } finally {
+          if (relFetchCtrls.get(uri) === ctrl) relFetchCtrls.delete(uri);
+        }
+      }
+
+      function renderRelationshipInfo(uri) {
+        const box = document.getElementById('eRelInfo');
+        if (!box) return;
+        const showDel = document.getElementById('showDeletedRels')?.checked;
+        const predFilterSel = document.getElementById('relPredicateFilter');
+        const predFilter = predFilterSel ? predFilterSel.value : 'all';
+        const qfEl = document.getElementById('relQuickFilter');
+        const quickFilter = (qfEl?.value || '').trim().toLowerCase();
+        const all = getCachedRelationships(uri);
+        let rels = showDel ? all : all.filter((r) => !r.deleted);
+        if (predFilter && predFilter !== 'all') {
+          const predName = (p) => {
+            if (!p) return '';
+            if (/metadata#near$/.test(p) || /#Near$/.test(p)) return 'near';
+            if (/metadata#contains$/.test(p) || /#Contains$/.test(p))
+              return 'contains';
+            if (/metadata#sameObjectAs$/.test(p) || /#SameObjectAs$/.test(p))
+              return 'sameObjectAs';
+            return p;
+          };
+          rels = rels.filter((r) => predName(r.predicate) === predFilter);
+        }
+        if (quickFilter) {
+          rels = rels.filter((r) => {
+            const o = String(r.other || '').toLowerCase();
+            const nm = String(r.name || '').toLowerCase();
+            const ds = String(r.description || '').toLowerCase();
+            return (
+              o.includes(quickFilter) ||
+              nm.includes(quickFilter) ||
+              ds.includes(quickFilter)
+            );
+          });
+        }
+        if (!all.length) {
+          box.innerHTML = '<em>Loading…</em>';
+          // kick off fetch silently
+          ensureRelationships(uri);
+          return;
+        }
+        if (!rels.length) {
+          box.innerHTML = '<em>No relationships yet.</em>';
+          return;
+        }
+        const wrap = document.createElement('div');
+        wrap.style.maxHeight = '160px';
+        wrap.style.overflow = 'auto';
+        const page = Math.max(1, relPageState[uri] || 1);
+        const start = 0;
+        // Collapse exact duplicates (predicate+other+incoming+deleted)
+        const keyOf = (r) =>
+          `${r.predicate}||${r.other}||${r.incoming ? '1' : '0'}||${r.deleted ? '1' : '0'}`;
+        const uniqMap = new Map();
+        for (const r of rels) {
+          const k = keyOf(r);
+          if (!uniqMap.has(k)) uniqMap.set(k, r);
+        }
+        const dedup = [...uniqMap.values()];
+        // Stable-ish sort: predicate, other, outgoing first, active first
+        dedup.sort((a, b) => {
+          const ap = a.predicate || '';
+          const bp = b.predicate || '';
+          if (ap !== bp) return ap < bp ? -1 : 1;
+          const ao = a.other || '';
+          const bo = b.other || '';
+          if (ao !== bo) return ao < bo ? -1 : 1;
+          if (a.incoming !== b.incoming) return a.incoming ? 1 : -1; // outgoing (false) before incoming (true)
+          if (a.deleted !== b.deleted) return a.deleted ? 1 : -1; // active (false) before deleted (true)
+          return 0;
+        });
+        // Group totals BEFORE pagination for header counts
+        const totalsByPred = new Map();
+        const _predName = (p) => {
+          if (!p) return 'relation';
+          const m = p.match(/#(deleted)?(Near|Contains|SameObjectAs)$/);
+          if (m) {
+            return m[2]
+              .replace('SameObjectAs', 'sameObjectAs')
+              .replace('Near', 'near')
+              .replace('Contains', 'contains');
+          }
+          if (/metadata#near$/.test(p)) return 'near';
+          if (/metadata#contains$/.test(p)) return 'contains';
+          if (/metadata#sameObjectAs$/.test(p)) return 'sameObjectAs';
+          return p;
+        };
+        for (const r of dedup) {
+          const pn = _predName(r.predicate);
+          totalsByPred.set(pn, (totalsByPred.get(pn) || 0) + 1);
+        }
+        const end = Math.min(dedup.length, page * relPageSize);
+        const slice = dedup.slice(start, end);
+        const predName = (p) => {
+          if (!p) return 'relation';
+          const m = p.match(/#(deleted)?(Near|Contains|SameObjectAs)$/);
+          if (m) {
+            const base = m[2]
+              .replace('SameObjectAs', 'sameObjectAs')
+              .replace('Near', 'near')
+              .replace('Contains', 'contains');
+            return m[1] ? `${base} (deleted)` : base;
+          }
+          // also support non-deleted bare IRIs
+          if (/metadata#near$/.test(p)) return 'near';
+          if (/metadata#contains$/.test(p)) return 'contains';
+          if (/metadata#sameObjectAs$/.test(p)) return 'sameObjectAs';
+          return p;
+        };
+        // Group by predicate
+        const groups = new Map();
+        for (const rel of slice) {
+          const pn = predName(rel.predicate);
+          if (!groups.has(pn)) groups.set(pn, []);
+          groups.get(pn).push(rel);
+        }
+        for (const [pg, items] of groups.entries()) {
+          const header = document.createElement('div');
+          header.style.display = 'flex';
+          header.style.alignItems = 'baseline';
+          header.style.gap = '8px';
+          header.style.fontWeight = '600';
+          header.style.margin = '6px 0 2px';
+          const title = document.createElement('span');
+          title.textContent = pg;
+          const meta = document.createElement('span');
+          meta.style.fontWeight = '400';
+          meta.style.fontSize = '11px';
+          meta.style.color = 'var(--muted)';
+          const shown = items.length;
+          const total = totalsByPred.get(pg) || shown;
+          meta.textContent = `(${total} total, ${shown} shown)`;
+          header.appendChild(title);
+          header.appendChild(meta);
+          wrap.appendChild(header);
+          items.forEach((rel) => {
+            const row = document.createElement('div');
+            row.style.display = 'flex';
+            row.style.alignItems = 'center';
+            row.style.gap = '8px';
+            row.style.flexWrap = 'wrap';
+            const chk = document.createElement('input');
+            chk.type = 'checkbox';
+            chk.checked = !rel.deleted;
+            chk.title = rel.deleted
+              ? 'Enable relationship'
+              : 'Soft delete relationship';
+            chk.onchange = () => toggleRelationship(rel, chk.checked);
+            const span = document.createElement('span');
+            span.style.fontFamily = 'monospace';
+            const arrow = rel.incoming ? '←' : '→';
+            const other = (rel.other || '').trim() || '(unknown)';
+            const nm = (rel.name || '').trim();
+            span.textContent = `${arrow} ${other}`;
+            if (rel.deleted) span.style.opacity = '0.6';
+            row.appendChild(chk);
+            row.appendChild(span);
+            // Read-only meta view: show name/description if present
+            const ro = document.createElement('span');
+            ro.style.color = 'var(--muted-strong)';
+            ro.style.fontSize = '12px';
+            const parts = [];
+            if (nm) parts.push(`"${nm}"`);
+            const descText = (rel.description || '').trim();
+            if (descText) parts.push(descText);
+            if (parts.length) ro.textContent = ' — ' + parts.join(' — ');
+            row.appendChild(ro);
+            // Edit pencil
+            const editBtn = document.createElement('button');
+            editBtn.title = 'edit relationship';
+            editBtn.textContent = '✏️';
+            editBtn.className = 'btn-ghost btn-sm';
+            editBtn.style.marginLeft = '4px';
+            row.appendChild(editBtn);
+
+            // Always show a read-only history toggle (shows current + previous values if any)
+            const histBtn = document.createElement('button');
+            histBtn.title = 'show history';
+            histBtn.textContent = '⏱️';
+            histBtn.className = 'btn-ghost btn-sm';
+            row.appendChild(histBtn);
+            const histBox = document.createElement('div');
+            histBox.style.display = 'none';
+            histBox.style.margin = '4px 0 0 24px';
+            histBox.style.fontSize = '12px';
+            histBox.style.color = 'var(--muted)';
+            const renderHist = () => {
+              const parse = (arr) =>
+                (arr || []).map((s) => {
+                  const m = String(s).split('::');
+                  return { ts: m[0] || '', value: m.slice(1).join('::') };
+                });
+              const nItems = parse(rel.nameHistory || []);
+              const dItems = parse(rel.descriptionHistory || []);
+              const wrap2 = document.createElement('div');
+              // Current snapshot
+              const cur = document.createElement('div');
+              cur.style.marginBottom = '6px';
+              cur.innerHTML =
+                `<div style="font-weight:600">Current</div>` +
+                `<div>${nm ? `Name: "${nm}"` : 'Name: (none)'}</div>` +
+                `<div>${(rel.description || '').trim() ? `Description: ${rel.description.trim()}` : 'Description: (none)'}</div>`;
+              wrap2.appendChild(cur);
+              // History sections
+              if (nItems.length) {
+                const h = document.createElement('div');
+                h.textContent = 'Named Relationship history:';
+                h.style.fontWeight = '600';
+                wrap2.appendChild(h);
+                nItems.forEach((it) => {
+                  const li = document.createElement('div');
+                  li.textContent = `${it.ts} — "${it.value}"`;
+                  wrap2.appendChild(li);
+                });
+              }
+              if (dItems.length) {
+                const h = document.createElement('div');
+                h.textContent = 'Description history:';
+                h.style.fontWeight = '600';
+                h.style.marginTop = nItems.length ? '6px' : '0';
+                wrap2.appendChild(h);
+                dItems.forEach((it) => {
+                  const li = document.createElement('div');
+                  li.textContent = `${it.ts} — ${it.value}`;
+                  wrap2.appendChild(li);
+                });
+              }
+              if (!nItems.length && !dItems.length) {
+                const none = document.createElement('div');
+                none.style.fontStyle = 'italic';
+                none.textContent = 'No previous changes.';
+                wrap2.appendChild(none);
+              }
+              return wrap2;
+            };
+            histBtn.onclick = (e) => {
+              e.preventDefault();
+              if (histBox.style.display === 'none') {
+                histBox.innerHTML = '';
+                histBox.appendChild(renderHist());
+                histBox.style.display = 'block';
+                histBtn.title = 'hide history';
+              } else {
+                histBox.style.display = 'none';
+                histBtn.title = 'show history';
+              }
+            };
+            row.appendChild(histBox);
+
+            // Hidden inline editor (appears on edit click)
+            const metaBox = document.createElement('div');
+            metaBox.style.display = 'none';
+            metaBox.style.alignItems = 'center';
+            metaBox.style.gap = '6px';
+            metaBox.style.margin = '4px 0 0 24px';
+            metaBox.style.width = '100%';
+            const nameLabel = document.createElement('label');
+            nameLabel.textContent = 'Named Relationship';
+            nameLabel.style.fontSize = '11px';
+            const nameInput = document.createElement('input');
+            nameInput.placeholder = 'optional…';
+            nameInput.value = nm;
+            nameInput.size = 14;
+            const descLabel = document.createElement('label');
+            descLabel.textContent = 'Description';
+            descLabel.style.fontSize = '11px';
+            const descInput = document.createElement('input');
+            descInput.placeholder = 'optional…';
+            descInput.value = (rel.description || '').trim();
+            descInput.size = 18;
+            const saveBtn = document.createElement('button');
+            saveBtn.textContent = 'Save';
+            saveBtn.className = 'btn-ok btn-sm';
+            const cancelBtn = document.createElement('button');
+            cancelBtn.textContent = 'Cancel';
+            cancelBtn.className = 'btn-ghost btn-sm';
+
+            editBtn.onclick = (e) => {
+              e.preventDefault();
+              metaBox.style.display = 'flex';
+              editBtn.disabled = true;
+                try { logEvent('rel_meta_open', { predicate: rel.predicate, other: rel.other, incoming: !!rel.incoming }); } catch (err) { console.warn('logEvent rel_meta_open', err); }
+            };
+            cancelBtn.onclick = (e) => {
+              e.preventDefault();
+              metaBox.style.display = 'none';
+              editBtn.disabled = false;
+                try { logEvent('rel_meta_cancel', { predicate: rel.predicate, other: rel.other, incoming: !!rel.incoming }); } catch (err) { console.warn('logEvent rel_meta_cancel', err); }
+            };
+            saveBtn.onclick = (e) => {
+              e.preventDefault();
+              const t0 = performance.now();
+              const subjUri = document.getElementById('eUri').textContent;
+              const subject = rel.incoming ? rel.other : subjUri;
+              const object = rel.incoming ? subjUri : rel.other;
+              sock.emit('updateRelationshipMeta', {
+                subject,
+                predicate: rel.predicate,
+                object,
+                name: (nameInput.value || '').trim(),
+                description: (descInput.value || '').trim(),
+              });
+              // Optimistic UI + hide editor; server broadcast will refresh
+              rel.name = (nameInput.value || '').trim();
+              rel.description = (descInput.value || '').trim();
+              showToast('Saved relationship metadata');
+              metaBox.style.display = 'none';
+              editBtn.disabled = false;
+              // Update read-only display instantly
+              const parts2 = [];
+              if (rel.name) parts2.push(`"${rel.name}"`);
+              if (rel.description) parts2.push(rel.description);
+              ro.textContent = parts2.length ? ' — ' + parts2.join(' — ') : '';
+              // Hide any open history to avoid stale view; it will refresh after broadcast
+              if (histBox) histBox.style.display = 'none';
+                try { logEvent('rel_meta_save', { predicate: rel.predicate, other: rel.other, incoming: !!rel.incoming, hasName: !!rel.name, hasDescription: !!rel.description, durationMs: performance.now()-t0 }); } catch (err) { console.warn('logEvent rel_meta_save', err); }
+            };
+            metaBox.appendChild(nameLabel);
+            metaBox.appendChild(nameInput);
+            metaBox.appendChild(descLabel);
+            metaBox.appendChild(descInput);
+            metaBox.appendChild(saveBtn);
+            metaBox.appendChild(cancelBtn);
+            row.appendChild(metaBox);
+            wrap.appendChild(row);
+          });
+        }
+        // Pager
+        if (end < dedup.length) {
+          const more = document.createElement('button');
+          more.textContent = `Show more (${dedup.length - end} more)`;
+          more.style.marginTop = '6px';
+          more.onclick = () => {
+            relPageState[uri] = page + 1;
+            renderRelationshipInfo(uri);
+          };
+          const ctr = document.createElement('div');
+          ctr.appendChild(more);
+          wrap.appendChild(ctr);
+        } else if (dedup.length > relPageSize) {
+          const less = document.createElement('button');
+          less.textContent = 'Show less';
+          less.style.marginTop = '6px';
+          less.onclick = () => {
+            relPageState[uri] = 1;
+            renderRelationshipInfo(uri);
+          };
+          const ctr = document.createElement('div');
+          ctr.appendChild(less);
+          wrap.appendChild(ctr);
+        }
+        box.innerHTML = '';
+        box.appendChild(wrap);
+      }
+
+      function toggleRelationship(rel, enabled) {
+        rel.deleted = !enabled;
+        // Persist on server: move triple between active/deleted variants
+        const subjUri = document.getElementById('eUri').textContent;
+        const subject = rel.incoming ? rel.other : subjUri;
+        const object = rel.incoming ? subjUri : rel.other;
+        sock.emit('toggleRelationship', {
+          subject,
+          predicate: rel.predicate,
+          object,
+          enabled,
+        });
+        // Update immediately
+        renderRelationshipInfo(subjUri);
+          try { logEvent('rel_toggle', { subject, predicate: rel.predicate, object, incoming: !!rel.incoming, enabled: !!enabled }); } catch (err) { console.warn('logEvent rel_toggle', err); }
+      }
+
+      // Refresh relationship panel when server broadcasts updates
+      sock.on('relationshipsUpdated', ({ subject }) => {
+        const cur = document.getElementById('eUri')?.textContent;
+        if (cur && subject === cur && eDetails.style.display === 'block')
+          ensureRelationships(cur, true);
+      });
+
+      // Toast / snackbar
+      (function ensureToast() {
+        if (!document.getElementById('toast')) {
+          const t = document.createElement('div');
+          t.id = 'toast';
+          t.style.position = 'fixed';
+          t.style.right = '12px';
+          t.style.bottom = '12px';
+          t.style.background = '#333';
+          t.style.color = '#fff';
+          t.style.padding = '8px 12px';
+          t.style.borderRadius = '4px';
+          t.style.boxShadow = '0 2px 6px #0004';
+          t.style.display = 'none';
+          t.style.zIndex = '3000';
+          document.body.appendChild(t);
+        }
+        window.showToast = (msg) => {
+          const t = document.getElementById('toast');
+          if (!t) return;
+          t.textContent = msg;
+          t.style.display = 'block';
+          clearTimeout(window._toastTimer);
+          window._toastTimer = setTimeout(() => {
+            t.style.display = 'none';
+          }, 2000);
+        };
+      })();
+
+      // Make region editor draggable to support sticky positioning
+      (function enableDrag() {
+        let dragging = false;
+        let offX = 0,
+          offY = 0;
+        const header = regionEd.querySelector('h3');
+        const anchor = header || regionEd;
+        anchor.style.cursor = 'move';
+        anchor.addEventListener('mousedown', (e) => {
+          // don't start dragging when interacting with controls inside the header
+          if (
+            e.target &&
+            e.target.closest &&
+            e.target.closest('button,select,input,label')
+          )
+            return;
+          dragging = true;
+          const rect = regionEd.getBoundingClientRect();
+          offX = e.clientX - rect.left;
+          offY = e.clientY - rect.top;
+          e.preventDefault();
+        });
+        window.addEventListener('mousemove', (e) => {
+          if (!dragging) return;
+          const L = e.clientX - offX;
+          const T = e.clientY - offY;
+          regionEd.style.left = Math.max(0, L) + 'px';
+          regionEd.style.top = Math.max(0, T) + 'px';
+        });
+        window.addEventListener('mouseup', () => {
+          if (!dragging) return;
+          dragging = false;
+          const rect = regionEd.getBoundingClientRect();
+          lastEditorPos = { left: rect.left, top: rect.top };
+        });
+      })();
+
+      // Settings panel wiring
+    (function settingsWiring() {
+        if (!settingsBtn || !settingsPanel) return;
+        const open = () => {
+          settingsPanel.style.display = 'block';
+          const cur =
+            parseInt(
+              localStorage.getItem('settings.relPageDefault') || '50',
+              10,
+            ) || 50;
+          if (settingsRelPageDefault)
+            settingsRelPageDefault.value = String(cur);
+      // theme current
+      const tcur = localStorage.getItem('settings.theme') || 'system';
+      if (settingsTheme) settingsTheme.value = tcur;
+        };
+        const close = () => {
+          settingsPanel.style.display = 'none';
+        };
+        settingsBtn.onclick = (e) => {
+          e.preventDefault();
+          (settingsPanel.style.display === 'block' ? close : open)();
+        };
+        // Apply theme instantly on change (preview), still persisted on Save
+        settingsTheme?.addEventListener('change', () => {
+          const t = settingsTheme.value || 'system';
+          applyTheme(t);
+        });
+        settingsAccent?.addEventListener('input', () => {
+          applyAccent(settingsAccent.value || '#4f8cff');
+        });
+        settingsCancel.onclick = (e) => {
+          e.preventDefault();
+          close();
+        };
+        settingsSave.onclick = (e) => {
+          e.preventDefault();
+          const v = parseInt(settingsRelPageDefault.value || '50', 10) || 50;
+          localStorage.setItem('settings.relPageDefault', String(v));
+          // Apply the chosen default to current session so the Details popup reflects it immediately
+          relPageSize = v;
+          localStorage.setItem('relPageSize', String(v));
+          const sel = document.getElementById('relPageSizeSel');
+          if (sel) sel.value = String(v);
+          // If Details open, re-render with new size
+          const cur = document.getElementById('eUri')?.textContent;
+          if (cur && eDetails.style.display === 'block') {
+            relPageState[cur] = 1;
+            renderRelationshipInfo(cur);
+          }
+      // theme
+      const t = (settingsTheme?.value || 'system');
+      applyTheme(t);
+          // accent
+          if (settingsAccent) applyAccent(settingsAccent.value || '#4f8cff');
+          close();
+        };
+        // click-away close
+        document.addEventListener('click', (evt) => {
+          if (!settingsPanel || settingsPanel.style.display !== 'block') return;
+          const within =
+            settingsPanel.contains(evt.target) ||
+            settingsBtn.contains(evt.target);
+          if (!within) settingsPanel.style.display = 'none';
+        });
+      })();
+      eCancel.onclick = (_) => {
+        regionEd.style.display = 'none';
+        // Clear manual/URI highlights when cancelling the editor
+        regs.forEach((r) => (r._hl = false));
+        pendingDeletedOverlay = null;
+        drawOverlay();
+          try { const id = eIdHidden.value; const uri = document.getElementById('eUri')?.textContent || ''; logEvent('editor_cancel', { id, uri }); } catch (err) { console.warn('logEvent editor_cancel', err); }
+      };
+      eSave.onclick = (_) => {
+        const id = eIdHidden.value,
+          t = eTags.value
+            .split(',')
+            .map((s) => s.trim())
+            .filter(Boolean);
+        const A = eA.value.trim(),
+          B = eB.value.trim(),
+          rel = eRel.value,
+          ont = A && B ? { relation: rel, uriA: A, uriB: B } : null;
+        const r = regs.find((x) => x.id === id);
+        if (!r) return;
+          try { logEvent('region_save', { id, uri: (r.metadata?.uri||''), tagsCount: t.length, hasOnt: !!ont, rel: ont?.relation||null }); } catch (err) { console.warn('logEvent region_save', err); }
+        sock.emit('updateRegion', {
+          regionId: id,
+          newTags: t,
+          newMeta: {},
+          boundary: r.boundary,
+          ontologyAction: ont,
+          relationName: (eRelName?.value || '').trim() || undefined,
+          relationDescription: (eRelDesc?.value || '').trim() || undefined,
+        });
+        regionEd.style.display = 'none';
+        drawOverlay();
+        buildDD();
+        ensureRelationships(eUri.textContent, true);
+      };
+      eDel.onclick = (_) => {
+          try { const id = eIdHidden.value; const uri = document.getElementById('eUri')?.textContent || ''; logEvent('region_delete', { id, uri }); } catch (err) { console.warn('logEvent region_delete', err); }
+        sock.emit('deleteRegion', { regionId: eIdHidden.value });
+        regionEd.style.display = 'none';
+        drawOverlay();
+        buildDD();
+      };
+
+      /* live socket echo */
+      sock.on('regionUpdated', (d) => {
+        const i = regs.findIndex((r) => r.id === d.regionId);
+        if (i === -1) regs.push(d.region);
+        else regs[i] = d.region;
+        const u = d.region?.metadata?.uri;
+        if (u) uriMap.set(u, d.region);
+        drawOverlay();
+        buildDD();
+      });
+      sock.on('regionDeleted', (d) => {
+        const r = regs.find((x) => x.id === d.regionId);
+        if (r) {
+          r.metadata.deleted = true;
+          const u = r.metadata?.uri;
+          if (u && uriMap.get(u)?.id === r.id) uriMap.delete(u);
+        }
+        drawOverlay();
+        buildDD();
+      });
+
+      // Cluster changes may propagate relationship updates; refresh Details if open
+      sock.on('clustersChanged', () => {
+        const cur = document.getElementById('eUri')?.textContent;
+        const detailsOpen = document.getElementById('eDetails')?.style.display === 'block';
+        if (cur && detailsOpen) ensureRelationships(cur, true);
+      });
+
+      /* SPARQL  ── table + yellow-highlight */
+  run.onclick = async () => {
+        if (activeTab === 'sparql') {
+          const query = q.value.trim();
+          if (!query) return;
+          // table
+          const rows = await fetch(
+            `/sparql?sockId=${encodeURIComponent(sock.id)}`,
+            { method: 'POST', headers: { 'Content-Type': 'text/plain' }, body: query },
+          ).then((r) => r.json());
+          await renderTable(rows);
+          if (!Array.isArray(rows) || rows.length === 0) {
+            try { showToast('No matches'); } catch(_) {}
+          }
+          // highlight
+          const boxes = await fetch(`/highlight?includeDeleted=${showDeleted?.checked ? '1' : '0'}`,
+            { method: 'POST', headers: { 'Content-Type': 'text/plain' }, body: query },
+          ).then((r) => r.json());
+          currentHighlightBoxes = Array.isArray(boxes) ? boxes : [];
+          drawOverlay();
+          return;
+        }
+        // Chat: send to server for NL→SPARQL → rows + highlights
+        const msg = chatBox.value.trim();
+        if (!msg) return;
+        const currentImageIri = 'urn:image:' + imgName();
+        sock.emit('chatAsk', { question: msg, imageId: currentImageIri });
+      };
+
+      // Clear SPARQL: empties query box, clears results (inline + popup), and removes SPARQL highlight boxes
+      const clearBtn = document.getElementById('clearSparql');
+      clearBtn?.addEventListener('click', () => {
+        // Clear active editor
+        if (activeTab==='sparql') { const qEl = document.getElementById('q'); if (qEl) qEl.value = ''; }
+        else { if (chatBox) chatBox.value = ''; }
+        // Clear results
+        lastResultRows = null;
+        const resEl = document.getElementById('res');
+        if (resEl) resEl.innerHTML = '';
+        if (typeof resPopupBody !== 'undefined' && resPopupBody) resPopupBody.innerHTML = '';
+        // Clear only SPARQL highlight overlays (keep manual/URI highlights intact)
+        currentHighlightBoxes = [];
+        drawOverlay();
+      });
+
+      /* RenderTable with robust header + friendly labels + header fallback
+         Also supports optional enrichment columns for simple region lists when showResDetails=true.
+         Renders into inline #res and, if popup is open, into #resPopupBody too. */
+      const renderTable = async (rows) => {
+        lastResultRows = rows;
+        const renderOne = async (targetEl) => {
+          targetEl.innerHTML = '';
+          if (!Array.isArray(rows) || rows.length === 0) {
+            targetEl.textContent = '(no results)';
+            return;
+          }
+          // If showing simple region list, optionally drop deleted rows unless the audit toggle is on
+          const showDeletedFlag = !!(showDeleted && showDeleted.checked);
+          const tbl = document.createElement('table');
+          const thead = tbl.createTHead();
+          const head = thead.insertRow();
+          const tbody = tbl.createTBody();
+          // Collect all columns present across rows
+          const allCols = Array.from(
+            rows.reduce((s, r) => {
+              Object.keys(r || {}).forEach((k) => s.add(k));
+              return s;
+            }, new Set()),
+          );
+          // Preferred ordering for common SPARQL vars
+          const pref = [
+            'r', 's', 'subject', 'p', 'predicate', 'o', 'object',
+            'name', 'description', 'other', 'incoming', 'deleted', 'confidence',
+            'boundary', 'area', 'center', 'tag', 'source'
+          ];
+          const rank = (k) => {
+            const i = pref.indexOf(k);
+            return i === -1 ? 999 : i;
+          };
+          const cols = allCols.sort((a, b) => (rank(a) - rank(b)) || (a < b ? -1 : 1));
+
+          // Heuristic: if the result is a simple list of regions (one region-like column and no predicate),
+          // allow enrichment with human-useful info from the local registry (boundary, confidence, source, area, center, tag)
+          const regionKeyCandidates = ['r', 's', 'o', 'subject', 'object'];
+          const regionColsPresent = regionKeyCandidates.filter((k) => cols.includes(k));
+          const isSimpleRegionList =
+            regionColsPresent.length === 1 && !cols.includes('p') && !cols.includes('predicate');
+          const enrichedCols = [];
+          // Only enrich inside popup to avoid layout shifts in the inline bar
+          const enrichNow = isSimpleRegionList && showResDetails && targetEl === resPopupBody;
+          const isPairs =
+            (cols.includes('s') || cols.includes('subject')) &&
+            (cols.includes('o') || cols.includes('object'));
+          const enrichPairsNow = isPairs && showResDetails && targetEl === resPopupBody;
+          let pairMetaMap = null;
+          if (enrichNow) {
+            ['boundary', 'confidence', 'source', 'area', 'center', 'tag'].forEach((k) => {
+              if (!cols.includes(k)) {
+                cols.push(k);
+                enrichedCols.push(k);
+              }
+            });
+          }
+          if (enrichPairsNow) {
+            // ensure readable relationship columns
+            if (!cols.includes('name')) cols.push('name');
+            if (!cols.includes('description') && !cols.includes('desc')) cols.push('description');
+            // Build VALUES for unique (s,p,o)
+            const sKey = cols.includes('s') ? 's' : 'subject';
+            const oKey = cols.includes('o') ? 'o' : 'object';
+            const pKey = cols.includes('pred') ? 'pred' : (cols.includes('p') ? 'p' : (cols.includes('predicate') ? 'predicate' : null));
+            if (pKey) {
+              const seen = new Set();
+              const triples = [];
+              rows.forEach((r) => {
+                const s = r[sKey], o = r[oKey], p = r[pKey];
+                if (!s || !o || !p) return;
+                const key = s+'|||'+p+'|||'+o; if (seen.has(key)) return; seen.add(key);
+                triples.push(`(<${s}> <${p}> <${o}>)`);
+              });
+              if (triples.length) {
+                const qMeta = `PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>\nPREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>\nPREFIX md:  <http://example.org/metadata#>\nSELECT ?s ?o ?pred ?name ?description WHERE {\n  VALUES (?s ?pred ?o) { ${triples.join(' ')} }\n  ?stmt a rdf:Statement ; rdf:subject ?s ; rdf:predicate ?pred ; rdf:object ?o .\n  OPTIONAL { ?stmt (md:relationshipName|rdfs:label) ?name . }\n  OPTIONAL { ?stmt md:relationshipDescription ?description . }\n}`;
+                try {
+                  const metaRows = await fetch('/sparql', { method: 'POST', headers: { 'Content-Type': 'text/plain' }, body: qMeta }).then(r=>r.json());
+                  pairMetaMap = new Map(metaRows.map(m => [ `${m.s}|||${m.pred}|||${m.o}`, { name: m.name, description: m.description } ]));
+                } catch(_) { /* ignore */ }
+              }
+            }
+          }
+          const nice = (k) => {
+            const map = {
+              r: 'Region', s: 'Subject', o: 'Object', p: 'Predicate', pred: 'Predicate',
+              subject: 'Subject', object: 'Object', predicate: 'Predicate',
+              name: 'Named Relationship', description: 'Description', desc: 'Description', other: 'Other',
+              incoming: 'Incoming', deleted: 'Deleted', confidence: 'Confidence',
+              boundary: 'Boundary', source: 'Source', area: 'Area', center: 'Center', tag: 'Tag',
+            };
+            return map[k] || (k.charAt(0).toUpperCase() + k.slice(1));
+          };
+          cols.forEach((k) => {
+            const th = document.createElement('th');
+            th.textContent = nice(k);
+            th.title = `variable: ${k}`;
+            head.appendChild(th);
+          });
+          // Build URI → region maps (active-only and union with deleted from allRegions)
+          const uriToActive = new Map(
+            (regs || [])
+              .filter((r) => !r?.metadata?.deleted)
+              .map((r) => [r?.metadata?.uri, r]),
+          );
+          const uriToReg = new Map();
+          const idToReg = new Map();
+          (regs || []).forEach((r) => {
+            const u = r?.metadata?.uri; if (!u) return;
+            const nu = normalizeUri(u);
+            if (u) { if (!uriToReg.has(u)) uriToReg.set(u, r); if (nu && !uriToReg.has(nu)) uriToReg.set(nu, r); }
+            if (r?.id != null && !idToReg.has(r.id)) idToReg.set(r.id, r);
+          });
+          if (Array.isArray(window._allRegions)) {
+            window._allRegions.forEach((r) => {
+              const u = r?.metadata?.uri; if (!u) return;
+              const nu = normalizeUri(u);
+              if (!uriToReg.has(u)) uriToReg.set(u, r);
+              if (nu && !uriToReg.has(nu)) uriToReg.set(nu, r);
+              if (r?.id != null && !idToReg.has(r.id)) idToReg.set(r.id, r);
+            });
+          }
+          const getRegionExact = (val) => uriToReg.get(normalizeUri(val)) || uriToReg.get(val) || null;
+          const mergedSrcSet = new Set(
+            Array.isArray(window._mergedSources)
+              ? window._mergedSources.map((m) => m.src)
+              : []
+          );
+          const mergedSrcToTarget = new Map(
+            Array.isArray(window._mergedSources)
+              ? window._mergedSources.map((m) => [normalizeUri(m.src || ''), { target: m.target, targetId: m.targetId }])
+              : []
+          );
+          // Effective region: exact match, else resolve merged source to its target region
+          const getEffectiveRegion = (val) => {
+            const exact = getRegionExact(val);
+            if (exact) return exact;
+            const key = normalizeUri(val || '');
+            const mt = mergedSrcToTarget.get(key) || mergedSrcToTarget.get(val || '');
+            if (mt) {
+              if (mt.target) {
+                const byUri = getRegionExact(mt.target);
+                if (byUri) return byUri;
+              }
+              if (mt.targetId != null && idToReg.has(mt.targetId)) return idToReg.get(mt.targetId);
+            }
+            return null;
+          };
+          const fmtBoundary = (b) =>
+            b ? `${b.x1},${b.y1} – ${b.x2},${b.y2}` : '';
+          // Deduplicate simple region rows by their region URI to avoid repeats
+          const seenUris = new Set();
+      rows.forEach((row) => {
+            const tr = tbody.insertRow();
+            // General filtering: if row references only deleted regions among values that resolve to known regions and audit is off, drop the row
+            const regionUris = [
+              ...regionColsPresent.map((rk) => row[rk]),
+              ...cols.map((ck) => row[ck]).filter((v) => typeof v === 'string' && !!getRegionExact(v)),
+            ].filter((v) => typeof v === 'string' && normalizeUri(v).length);
+            if (!showDeletedFlag && regionUris.length) {
+              const statuses = regionUris.map((u) => !!getRegionExact(u)?.metadata?.deleted);
+              const hasResolved = regionUris.some((u) => !!getRegionExact(u));
+              const allDeleted = hasResolved && statuses.every((x) => x === true);
+              if (allDeleted) {
+                tbody.removeChild(tr);
+                return;
+              }
+            }
+            if (isSimpleRegionList) {
+              const rk = regionColsPresent[0];
+        const ruri = row[rk];
+        // filter deleted rows unless toggle is on (fallback: if unknown URI, keep row)
+        const R = getRegionExact(ruri);
+              const isDel = !!R?.metadata?.deleted;
+              if (isDel && !showDeletedFlag) {
+                tbody.removeChild(tr);
+                return;
+              }
+        if (ruri && seenUris.has(normalizeUri(ruri))) {
+                tbody.removeChild(tr);
+                return;
+              }
+        if (ruri) seenUris.add(normalizeUri(ruri));
+              if (isDel) tr.classList.add('deleted');
+            }
+            cols.forEach((k) => {
+              const td = tr.insertCell();
+              // If this is one of the enriched columns, compute from the single region in the row
+              if (enrichNow && enrichedCols.includes(k)) {
+                const rk = regionColsPresent[0];
+                const ruri = row[rk];
+                const R = getEffectiveRegion(ruri);
+                const b = R?.boundary;
+                if (k === 'boundary') {
+                  td.textContent = fmtBoundary(b);
+                  if (b) td.title = `x1:${b.x1}, y1:${b.y1}, x2:${b.x2}, y2:${b.y2}`;
+                } else if (k === 'confidence') {
+                  const c = R ? getConfidence(R) : null;
+                  td.textContent = c == null ? '' : String(c);
+                  if (c != null) td.title = 'Autodetected confidence';
+                } else if (k === 'source') {
+                  const c = R ? getConfidence(R) : null;
+                  td.textContent = c == null ? 'Manual' : 'Auto';
+                  td.title = c == null ? 'Manually annotated' : 'Autodetected by model';
+                  // Intentionally no state badges in Source to avoid confusion
+                } else if (k === 'area') {
+                  if (b) {
+                    const w = Math.max(0, (b.x2 ?? 0) - (b.x1 ?? 0));
+                    const h = Math.max(0, (b.y2 ?? 0) - (b.y1 ?? 0));
+                    td.textContent = `${w}×${h}`;
+                    td.title = `w:${w}, h:${h}`;
+                  } else td.textContent = '';
+                } else if (k === 'center') {
+                  if (b) {
+                    const cx = Math.round(((b.x1 ?? 0) + (b.x2 ?? 0)) / 2);
+                    const cy = Math.round(((b.y1 ?? 0) + (b.y2 ?? 0)) / 2);
+                    td.textContent = `${cx}, ${cy}`;
+                    td.title = `cx:${cx}, cy:${cy}`;
+                  } else td.textContent = '';
+                } else if (k === 'tag') {
+                  const t = Array.isArray(R?.tags) && R.tags.length ? R.tags[0] : '';
+                  td.textContent = t || '';
+                } else {
+                  td.textContent = '';
+                }
+                return;
+              }
+              // default: render value directly; for pairs enrich name/description
+              let v = row[k];
+              if (enrichPairsNow && (k === 'name' || k === 'description' || k === 'desc')) {
+                const sKey2 = row.s !== undefined ? 's' : (row.subject !== undefined ? 'subject' : 's');
+                const oKey2 = row.o !== undefined ? 'o' : (row.object !== undefined ? 'object' : 'o');
+                const pKey2 = row.pred !== undefined ? 'pred' : (row.p !== undefined ? 'p' : (row.predicate !== undefined ? 'predicate' : 'pred'));
+                const meta = pairMetaMap && pairMetaMap.get(`${row[sKey2]}|||${row[pKey2]}|||${row[oKey2]}`);
+                if (meta) v = (k === 'name') ? (meta.name || v) : (meta.description || v);
+              }
+              td.textContent = v == null ? '' : String(v);
+              // For any cell that looks like a URI we know, add state badges for deleted/merged
+              if (regionKeyCandidates.includes(k) || (typeof v === 'string' && !!getRegionExact(v))) {
+                const uri = normalizeUri(v || '');
+                if (uri) {
+                  const R = getRegionExact(uri);
+                  if (showDeletedFlag && R?.metadata?.deleted) {
+                    const badge = document.createElement('span');
+                    badge.className = 'state-badge';
+                    badge.textContent = 'deleted';
+                    td.appendChild(badge);
+                  }
+                  if (mergedSrcSet.has(uri)) {
+                    const b2 = document.createElement('span');
+                    b2.className = 'state-badge';
+                    b2.textContent = 'merged';
+                    td.appendChild(b2);
+                  }
+                }
+              }
+            });
+          });
+          // Append and check if header rendered with a visible height; if not, create a fallback header row inside tbody
+          targetEl.appendChild(tbl);
+          try {
+            const hdrRect = head.getBoundingClientRect();
+            if (!hdrRect || hdrRect.height < 2) {
+              // Fallback: inject a first row in tbody as header-visible cells
+              const alt = tbody.insertRow(0);
+              alt.className = 'fallback-head';
+              cols.forEach((k) => {
+                const th = document.createElement('th');
+                th.textContent = nice(k);
+                th.title = `variable: ${k}`;
+                alt.appendChild(th);
+              });
+            }
+          } catch (_) {
+            // ignore measurement failures; table already rendered
+          }
+        };
+        await renderOne(res);
+        if (resultsPopup && resultsPopup.style.display !== 'none') await renderOne(resPopupBody);
+      };
+
+      /* ───────────── VOICE CAPTURE ───────────── */
+      /* voice recording → send base64 wav to server
+   ----------------------------------------------------------- */
+      let mediaRec = null,
+        chunks = [];
+      const recBtn = document.getElementById('recBtn');
+
+      recBtn.onclick = async () => {
+        if (!mediaRec) {
+          // first time: ask for mic
+          const stream = await navigator.mediaDevices.getUserMedia({
+            audio: true,
+          });
+          mediaRec = new MediaRecorder(stream, { mimeType: 'audio/webm' });
+
+          mediaRec.ondataavailable = (e) => chunks.push(e.data);
+          mediaRec.onstop = () => {
+            const blob = new Blob(chunks, { type: 'audio/webm' });
+            chunks.length = 0;
+            blob.arrayBuffer().then((buf) => {
+              // Send a canonical image IRI so the server/LLM never sees a relative IRI
+              const currentImageIri = 'urn:image:' + imgName();
+              sock.emit('voiceBlob', {
+                wavBase64: btoa(String.fromCharCode(...new Uint8Array(buf))),
+                imageId: currentImageIri,
+              });
+            });
+          };
+        }
+
+        if (mediaRec.state === 'inactive') {
+          mediaRec.start();
+          recBtn.textContent = '⏹ Stop';
+        } else {
+          mediaRec.stop();
+          recBtn.textContent = '🎤 Speak';
+        }
+      };
+
+      /* ─── server answers ───────────────────────────────────────── */
+
+      // function runSparqlLocally(rows){                  // reuse highlighter
+      //   renderTable(rows.map(b=>Object.fromEntries(
+      //     [...b].map(([k,v])=>[k.value.slice(1),v.value]))));
+      //   // highlight (IDs already broadcast separately)
+      // }
+
+      /* voice-driven SPARQL → local UI */
+      async function runSparqlLocally(rows) {
+        await renderTable(rows); // rows are already plain JSON
+        if (!Array.isArray(rows) || rows.length === 0) {
+          // Clear any previous highlights and notify
+          regs.forEach((r) => (r._hl = false));
+          drawOverlay();
+            try {
+              showToast('No matches');
+            } catch (err) { console.warn('showToast error', err); }
+          return;
+        }
+        // Fallback highlight: if table has ?r, server also sends ids; when it doesn't, try ?s/?o columns
+        const first = rows[0];
+        const uriCols = Object.keys(first).filter((k) =>
+          ['r', 's', 'o', 'subject', 'object'].includes(k),
+        );
+        if (uriCols.length) {
+          const ids = [];
+          const uriToId = new Map(regs.map((r) => [r.metadata?.uri, r.id]));
+          rows.forEach((row) => {
+            uriCols.forEach((k) => {
+              const id = uriToId.get(row[k]);
+              if (id != null) ids.push(id);
+            });
+          });
+          if (ids.length) {
+            regs.forEach((r) => (r._hl = ids.includes(r.id)));
+            drawOverlay();
+          }
+        }
+      }
+
+      sock.on('sparqlOk', ({ question, sparql, rows }) => {
+        document.getElementById('q').value = sparql;
+        runSparqlLocally(rows);
+      });
+
+      sock.on('sparqlErr', (msg) => alert('LLM error: ' + msg));
+
+      sock.on('highlightRegions', (ids) => {
+        // Highlight only non-deleted unless audit mode is on
+        const idSet = new Set(ids);
+        regs.forEach((r) => (r._hl = idSet.has(r.id) && (!r.metadata?.deleted || showDeleted?.checked)));
+        drawOverlay();
+      });
+  /* Results toolbar + popup behavior */
+      const rerenderResults = () => {
+        if (lastResultRows) renderTable(lastResultRows);
+      };
+      resDetailsPop?.addEventListener('change', (e) => {
+        showResDetails = !!e.target.checked;
+        rerenderResults();
+      });
+  resPopBtn?.addEventListener('click', () => {
+        if (!resultsPopup) return;
+        resultsPopup.style.display = 'block';
+        // Default snap to top-right, with small offset
+        resultsPopup.style.top = '56px';
+        resultsPopup.style.right = '12px';
+        resultsPopup.style.left = 'auto';
+        resultsPopup.style.bottom = 'auto';
+        if (resDetailsPop) resDetailsPop.checked = showResDetails;
+        rerenderResults();
+      });
+  resPopClose?.addEventListener('click', () => {
+    if (!resultsPopup) return;
+    resultsPopup.style.display = 'none';
+  });
+      // simple snap cycle: TR -> BR -> BL -> TL
+      let resSnapPos = 0;
+      resSnap?.addEventListener('click', () => {
+        if (!resultsPopup) return;
+        resSnapPos = (resSnapPos + 1) % 4;
+        const off = '12px';
+        resultsPopup.style.left = 'auto';
+        resultsPopup.style.top = 'auto';
+        resultsPopup.style.right = 'auto';
+        resultsPopup.style.bottom = 'auto';
+        if (resSnapPos === 0) { resultsPopup.style.top = '56px'; resultsPopup.style.right = off; }
+        else if (resSnapPos === 1) { resultsPopup.style.bottom = off; resultsPopup.style.right = off; }
+        else if (resSnapPos === 2) { resultsPopup.style.bottom = off; resultsPopup.style.left = off; }
+        else { resultsPopup.style.top = '56px'; resultsPopup.style.left = off; }
+      });
+
+      // Fit popup to content width/height (within viewport margins)
+      resFit?.addEventListener('click', () => {
+        if (!resultsPopup) return;
+        const tbl = resPopupBody?.querySelector('table');
+        if (!tbl) return;
+        // Measure table size
+        const rect = tbl.getBoundingClientRect();
+        // Include some padding for popup chrome
+        const padW = 28, padH = 56; // header + borders
+        const desiredW = Math.ceil(rect.width + padW);
+        const desiredH = Math.ceil(rect.height + padH);
+        const vw = Math.max(320, Math.floor(window.innerWidth * 0.95));
+        const vh = Math.max(180, Math.floor(window.innerHeight * 0.85));
+        resultsPopup.style.maxWidth = 'none';
+        resultsPopup.style.maxHeight = 'none';
+        resultsPopup.style.width = Math.min(desiredW, vw) + 'px';
+        resultsPopup.style.height = Math.min(desiredH, vh) + 'px';
+      });
+
+      // Make results popup draggable and resizable
+      (function enableResultsPopupInteractions() {
+        if (!resultsPopup) return;
+        let dragging = false;
+        let resizing = false;
+        let ox = 0, oy = 0, startX = 0, startY = 0, startW = 0, startH = 0;
+        const header = resultsPopup.querySelector('h3');
+        header?.addEventListener('mousedown', (e) => {
+          if (e.target.closest('button') || e.target.closest('input')) return;
+          dragging = true;
+          ox = e.clientX - (resultsPopup.offsetLeft || 0);
+          oy = e.clientY - (resultsPopup.offsetTop || 0);
+          e.preventDefault();
+        });
+        const resizer = document.getElementById('resizer');
+        resizer?.addEventListener('mousedown', (e) => {
+          const rect = resultsPopup.getBoundingClientRect();
+          resizing = true;
+          startX = e.clientX; startY = e.clientY;
+          startW = rect.width; startH = rect.height;
+          // Remove CSS max constraints while user-resizing
+          resultsPopup.style.maxWidth = 'none';
+          resultsPopup.style.maxHeight = 'none';
+          e.preventDefault();
+        });
+        window.addEventListener('mousemove', (e) => {
+          if (dragging) {
+            resultsPopup.style.left = Math.max(0, e.clientX - ox) + 'px';
+            resultsPopup.style.top = Math.max(0, e.clientY - oy) + 'px';
+          } else if (resizing) {
+            const dx = e.clientX - startX;
+            const dy = e.clientY - startY;
+            resultsPopup.style.width = Math.max(320, startW + dx) + 'px';
+            resultsPopup.style.height = Math.max(180, startH + dy) + 'px';
+          }
+        });
+        window.addEventListener('mouseup', () => { dragging = false; resizing = false; });
+  })();
+
+      // ── Editor popup interactions ──
+      runPop?.addEventListener('click', async () => {
+        if (!editorPopup) return;
+        if (activeTab === 'sparql') {
+          const query = (qPop.value || '').trim();
+          if (!query) return;
+          const rows = await fetch(`/sparql?sockId=${encodeURIComponent(sock.id)}`, {
+            method: 'POST', headers: { 'Content-Type': 'text/plain' }, body: query,
+          }).then(r => r.json());
+          await renderTable(rows);
+          q.value = qPop.value; // sync back
+        } else {
+          const msg = (chatPop.value || '').trim();
+          if (!msg) return;
+          const currentImageIri = 'urn:image:' + imgName();
+          sock.emit('chatAsk', { question: msg, imageId: currentImageIri });
+          chatBox.value = chatPop.value; // sync back
+        }
+      });
+      clearPop?.addEventListener('click', () => {
+        if (activeTab === 'sparql') qPop.value = ''; else chatPop.value = '';
+      });
+      (function enableEditorPopupInteractions(){
+        if (!editorPopup) return;
+        let dragging = false, resizing = false, ox=0, oy=0, startW=0, startH=0, startX=0, startY=0;
+        const header = editorPopup.querySelector('h3');
+        header?.addEventListener('mousedown', (e) => {
+          if (e.target.closest('button') || e.target.closest('input')) return;
+          dragging = true; ox = e.clientX - (editorPopup.offsetLeft || 0); oy = e.clientY - (editorPopup.offsetTop || 0); e.preventDefault();
+        });
+        const resizer = document.getElementById('editorResizer');
+        resizer?.addEventListener('mousedown', (e) => { const rect = editorPopup.getBoundingClientRect(); resizing = true; startX = e.clientX; startY = e.clientY; startW = rect.width; startH = rect.height; e.preventDefault(); });
+        window.addEventListener('mousemove', (e) => {
+          if (dragging) { editorPopup.style.left = Math.max(0, e.clientX - ox) + 'px'; editorPopup.style.top = Math.max(0, e.clientY - oy) + 'px'; }
+          else if (resizing) { const dx = e.clientX - startX, dy=e.clientY - startY; editorPopup.style.width = Math.max(360, startW + dx) + 'px'; editorPopup.style.height = Math.max(220, startH + dy) + 'px'; }
+        });
+        window.addEventListener('mouseup', () => { dragging=false; resizing=false; });
+      })();
+
+      // Re-render results when audit toggle changes
+      showDeleted?.addEventListener('change', () => {
+  if (lastResultRows) renderTable(lastResultRows);
+  // Redraw overlay to respect toggle for deleted visibility and persisted highlights
+  drawOverlay();
+      });
+
+      // Click outside canvas (but not on toolbars/controls) clears manual/URI highlights
+      document.addEventListener('click', (e) => {
+        const container = document.getElementById('canvasContainer');
+        const inCanvas = container && container.contains(e.target);
+        const isControl =
+          e.target.closest &&
+          e.target.closest('#topBar, #bar, #regionEditor, #settingsPanel, #resultsPopup');
+        if (!inCanvas && !isControl) {
+          regs.forEach((r) => (r._hl = false));
+          pendingDeletedOverlay = null;
+          drawOverlay();
+        }
+      });
+
+    // Escape key clears manual/URI highlights (keeps SPARQL highlights intact) and closes open panels
+      document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') {
+          regs.forEach((r) => (r._hl = false));
+          pendingDeletedOverlay = null;
+          // Also clear SPARQL canvas highlight boxes; keep query/results intact
+          currentHighlightBoxes = [];
+          drawOverlay();
+      // Close region editor if visible
+      if (regionEd && regionEd.style.display === 'block') regionEd.style.display = 'none';
+      // Close results popup if open
+      if (resultsPopup && resultsPopup.style.display !== 'none') resultsPopup.style.display = 'none';
+      // Close settings panel if open
+      if (settingsPanel && settingsPanel.style.display === 'block') settingsPanel.style.display = 'none';
+        }
+      });
+    </script>
+  </body>
+</html>

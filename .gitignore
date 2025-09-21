@@ -1,0 +1,97 @@
+# ------------------------------------------------------------
+# Node / JS
+# ------------------------------------------------------------
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Build / cache (add if later introduced)
+dist/
+build/
+.parcel-cache/
+.cache/
+
+# TypeScript build output (future-proof)
+*.tsbuildinfo
+
+# ------------------------------------------------------------
+# Environment & local config
+# ------------------------------------------------------------
+.env
+.env.*
+!.env.example
+
+# VSCode / IDE (keep workspace recommendations if added explicitly)
+.vscode/
+.idea/
+*.swp
+
+# ------------------------------------------------------------
+# Models & large ML artifacts
+# (Keep specific allow‑listed small metadata files if needed.)
+# ------------------------------------------------------------
+models/*.gguf
+models/*.bin
+models/*.pt
+models/*.pth
+models/*.onnx
+
+# Already-downloaded specific GGUF models (explicit for clarity)
+models/mistral-7b-instruct-v0.1.Q4_0.gguf
+models/orca-mini-3b-gguf2-q4_0.gguf
+
+# GPT4All local model lists
+models/models3.local.json
+models/models3.local.sanitized.json
+models/models.simple.json
+models/models.local.json
+
+# Whisper / HF caches (in case they are set locally)
+~/.cache/huggingface/
+hf_cache/
+
+# ------------------------------------------------------------
+# Generated data / outputs
+# ------------------------------------------------------------
+imageData.pht/
+output/
+*.log
+
+# Audio / transcription intermediates (optional - comment out if you want tracked)
+*.wav
+*.mp3
+*.flac
+
+# ------------------------------------------------------------
+# OS / misc
+# ------------------------------------------------------------
+.DS_Store
+Thumbs.db
+
+# ------------------------------------------------------------
+# Security / keys (patterns – ensure you never commit real keys)
+# ------------------------------------------------------------
+*.pem
+*.key
+*.crt
+*.der
+
+# ------------------------------------------------------------
+# Archives / temp
+# ------------------------------------------------------------
+*.tar
+*.tar.gz
+*.tgz
+*.zip
+*.7z
+*.bak
+*.tmp
+*.temp
+
+# Keep this line at end of file
+ecosystem.config.cjs
+
+# Ignore the entire Report folder (contains large docs and previous work)
+/Report/

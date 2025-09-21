@@ -1,0 +1,1417 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Global Registry – Semantic Image KG Viewer</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <!-- Sidebar: image selection -->
+    <div id="side">
+      <h3>Select Images</h3>
+      <div id="thumbs" style="overflow:auto; max-height: calc(100vh - 120px);">Loading…</div>
+      <button id="loadSel" class="btn-ok" style="width:100%;margin-top:8px; position:sticky; bottom:44px;">Load Selected</button>
+      <a href="/index.html" class="btn-ghost" style="display:block;text-align:center;margin-top:6px;text-decoration:none; position:sticky; bottom:10px;">← Back to Viewer</a>
+    </div>
+
+    <div id="main">
+      <div id="topBar">
+        <label
+          >Pick URI
+          <select id="uriDDGlobal">
+            <option>— None —</option>
+          </select></label>
+        <label
+          >or manual
+          <input id="uriManualGlobal" placeholder="Search or paste URI…" size="28"/>
+        </label>
+        <div id="toggles">
+          <label class="switch" title="Include deleted/merged in relationship lists">
+            <input type="checkbox" id="showDeleted" />
+            <span class="slider"></span>
+            <span class="switch-label">show deleted</span>
+          </label>
+          <label style="display:flex;align-items:center;gap:6px" title="Arrange collage by grouping">
+            Arrange
+            <select id="arrangeBy">
+              <option value="none">None</option>
+              <option value="image">Image</option>
+              <option value="tag">Tag</option>
+              <option value="predicate">Predicate</option>
+              <option value="cluster">Cluster</option>
+            </select>
+          </label>
+        </div>
+        <button id="settingsBtn" title="Settings" class="btn-primary">⚙</button>
+        <span style="margin-left:auto"></span>
+        <button id="recBtn" class="btn-primary" title="Press and ask">🎤 Speak</button>
+      </div>
+
+      <!-- Global tools: link two + cluster controls just under top bar -->
+      <div id="globalTools" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:6px 10px; border-bottom:1px solid var(--border); background: var(--panel); position:sticky; top: 42px; z-index: 550;">
+        <span class="state-badge" style="border:1px solid var(--border);padding:4px 6px;border-radius:6px">Select two tiles to link</span>
+        <span>A:</span><input id="selA" readonly size="18" placeholder="None" />
+        <span>B:</span><input id="selB" readonly size="18" placeholder="None" />
+        <select id="relType">
+          <option value="near">near</option>
+          <option value="contains">contains</option>
+          <option value="sameObjectAs">sameObjectAs</option>
+        </select>
+        <input id="relName" placeholder="Name (optional)" size="16" />
+        <button id="linkBtn" class="btn-primary btn-sm">Link</button>
+        <span style="margin-left:12px"></span>
+        <span class="state-badge" id="clusterCount" style="border:1px solid var(--border);padding:4px 6px;border-radius:6px">Cluster: 0</span>
+        <button id="clusterAddBtn" class="btn-ghost btn-sm" title="Add current selection to cluster">+ Add</button>
+        <input id="clusterName" placeholder="Named Cluster (optional)" size="18" />
+        <button id="clusterRunBtn" class="btn-primary btn-sm" title="Create sameObjectAs cluster and share relations">Create cluster</button>
+        <button id="clusterDelBtn" class="btn-danger btn-sm" title="Remove sameObjectAs edges for staged URIs">Delete cluster</button>
+        <span style="flex-basis:100%"></span>
+        <label>Pick Cluster
+          <select id="clusterDD"><option>— None —</option></select>
+        </label>
+        <button id="clusterDetailsBtn" class="btn-ghost btn-sm" title="Open cluster relationships">Details</button>
+        <button id="clusterDropDelete" class="btn-danger btn-sm" title="Soft-delete selected cluster">Delete</button>
+        <span style="margin-left:12px"></span>
+        <label>Link Clusters
+          <select id="clusterLinkA"><option>— None —</option></select>
+          →
+          <select id="clusterLinkB"><option>— None —</option></select>
+        </label>
+        <select id="clusterLinkPred" title="Cluster link predicate">
+          <option value="clusterLinkedTo">clusterLinkedTo</option>
+          <option value="sameObjectAs">sameObjectAs</option>
+          <option value="near">near</option>
+          <option value="contains">contains</option>
+        </select>
+        <input id="clusterLinkName" placeholder="Name (optional)" size="16" />
+        <label class="switch" title="Share Relationships (near/contains/sameObjectAs) between linked clusters"><input type="checkbox" id="clusterLinkPropagate" checked><span class="slider"></span><span class="switch-label">Share Relationships</span></label>
+        <span id="sharePredsBox" style="display:inline-flex;gap:6px;align-items:center">
+          <label title="Share near"><input type="checkbox" id="shareNear" checked> near</label>
+          <label title="Share contains"><input type="checkbox" id="shareContains" checked> contains</label>
+          <label title="Share sameObjectAs"><input type="checkbox" id="shareSame" checked> sameObjectAs</label>
+        </span>
+        <button id="clusterLinkBtn" class="btn-primary btn-sm">Link Clusters</button>
+        <button id="clusterUnlinkBtn" class="btn-danger btn-sm" title="Soft-delete link between selected clusters">Delete Link</button>
+        <button id="clusterShowLinkedBtn" class="btn-ghost btn-sm" title="Highlight selected + linked clusters">Show Linked</button>
+      </div>
+
+      <div id="canvasContainer">
+        <canvas id="collageCanvas"></canvas>
+      </div>
+
+      <div id="bar">
+        <div id="confBlock" style="visibility:hidden"></div>
+        <div id="queryGroup">
+          <div id="queryTabs">
+            <button id="tabSparql" class="tab active" title="Write or paste SPARQL">Sparql</button>
+            <button id="tabChat" class="tab" title="Ask in natural language">Chat</button>
+          </div>
+          <button id="queryPopBtn" class="btn-ghost btn-sm" title="Open editor in a popup">↗</button>
+          <textarea id="q" placeholder="SPARQL  query…"></textarea>
+          <textarea id="chat" placeholder="Ask in natural language…" style="display:none"></textarea>
+          <div class="queryActions">
+            <button id="run" class="btn-primary">Run</button>
+            <button id="clear" class="btn-ghost">Clear</button>
+          </div>
+          <!-- cluster/link controls under top bar -->
+        </div>
+        <div id="resPane">
+          <div id="resToolbar" title="Results options"></div>
+          <div id="res"></div>
+        </div>
+      </div>
+  </div>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script type="module" src="/js/relationships-ui.js"></script>
+    <!-- Suggestions for manual URI search -->
+    <datalist id="uriSuggGlobal"></datalist>
+    <!-- relationships popup -->
+    <div id="resultsPopup" style="display:none">
+      <h3 style="display:flex;align-items:center;justify-content:space-between;gap:8px">
+        <span>Relationships</span>
+        <button id="relPopClose" class="btn-ghost btn-sm" title="Close">✕</button>
+      </h3>
+      <div id="relPopupBody"></div>
+      <div id="resizer" class="resizer" title="Resize"></div>
+    </div>
+    <!-- editor popup (movable/resizable) -->
+    <div id="editorPopup" style="display:none">
+      <h3>
+        <span>Query Editor</span>
+        <span style="display:flex;gap:6px;align-items:center">
+          <button id="editorSnap" class="btn-primary btn-sm" title="Snap to a corner">↗</button>
+          <button id="editorClose" class="btn-ghost btn-sm" title="Close">✕</button>
+        </span>
+      </h3>
+      <div class="editor-body">
+        <div style="display:flex;gap:6px;align-items:center;padding-bottom:6px">
+          <button id="tabSparqlPop" class="tab active" title="Write or paste SPARQL">Sparql</button>
+          <button id="tabChatPop" class="tab" title="Ask in natural language">Chat</button>
+        </div>
+        <textarea id="qPop" placeholder="SPARQL  query…"></textarea>
+        <textarea id="chatPop" placeholder="Ask in natural language…" style="display:none"></textarea>
+        <div class="queryActionsPop">
+          <button id="runPop" class="btn-primary">Run</button>
+          <button id="clearPop" class="btn-ghost" title="Clear text">Clear</button>
+        </div>
+      </div>
+      <div id="editorResizer" class="resizer" title="Resize"></div>
+    </div>
+    <!-- Settings panel (copied/adapted from viewer) -->
+    <div id="settingsPanel" style="display:none">
+      <div style="font-weight: 600; margin-bottom: 6px">Settings</div>
+      <label title="Choose color theme (applies immediately)" style="display:flex;align-items:center;gap:8px">
+        ☀ Theme
+        <span id="themePreview" class="theme-chip" title="Preview"></span>
+        <select id="settingsTheme" style="flex:0 0 auto">
+          <option value="system">System</option>
+          <option value="light">Light</option>
+          <option value="dark">Dark</option>
+        </select>
+      </label>
+      <div style="height: 8px"></div>
+      <label title="Accent color for highlights and primary buttons" style="display:flex;align-items:center;gap:8px;margin-top:8px">
+        🎨 Accent
+        <input type="color" id="settingsAccent" value="#4f8cff"/>
+      </label>
+      <div style="height: 8px"></div>
+      <div style="font-weight: 600; margin: 8px 0 4px">Privacy</div>
+      <label class="switch" title="Apply face blurring when available (privacy)">
+        <input type="checkbox" id="settingsBlur" />
+        <span class="slider"></span>
+        <span class="switch-label">Blur faces</span>
+      </label>
+      <div style="margin-top:8px; display:flex; gap:6px; justify-content:flex-end;">
+        <button id="settingsSave" class="btn-ok">Save</button>
+        <button id="settingsCancel" class="btn-ghost">Close</button>
+      </div>
+    </div>
+
+    <script type="module">
+      import { attachRelationshipsUI } from '/js/relationships-ui.js';
+      const thumbs = document.getElementById('thumbs');
+      const loadSel = document.getElementById('loadSel');
+      const collage = document.getElementById('collageCanvas');
+      const q = document.getElementById('q');
+      const chat = document.getElementById('chat');
+      const tabSparql = document.getElementById('tabSparql');
+      const tabChat = document.getElementById('tabChat');
+      const run = document.getElementById('run');
+      const clearBtn = document.getElementById('clear');
+      const recBtn = document.getElementById('recBtn');
+      const res = document.getElementById('res');
+      // Editor popup handles
+      const editorPopup = document.getElementById('editorPopup');
+      const tabSparqlPop = document.getElementById('tabSparqlPop');
+      const tabChatPop = document.getElementById('tabChatPop');
+      const qPop = document.getElementById('qPop');
+      const chatPop = document.getElementById('chatPop');
+      const runPop = document.getElementById('runPop');
+      const clearPop = document.getElementById('clearPop');
+      const editorClose = document.getElementById('editorClose');
+      const editorSnap = document.getElementById('editorSnap');
+      const queryPopBtn = document.getElementById('queryPopBtn');
+      const uriDD = document.getElementById('uriDDGlobal');
+      const uriManual = document.getElementById('uriManualGlobal');
+      const showDeleted = document.getElementById('showDeleted');
+      const settingsBtn = document.getElementById('settingsBtn');
+      // Extra suggest items for audit pools are declared below with deletedRegionItems
+      // Link/cluster controls
+      // moved to top for correct initialization
+      const clusterNameInput = document.getElementById('clusterName');
+      const clusterDD = document.getElementById('clusterDD');
+      const clusterDetailsBtn = document.getElementById('clusterDetailsBtn');
+      const clusterLinkA = document.getElementById('clusterLinkA');
+      const clusterLinkB = document.getElementById('clusterLinkB');
+      const clusterLinkPred = document.getElementById('clusterLinkPred');
+      const clusterLinkName = document.getElementById('clusterLinkName');
+      const clusterLinkBtn = document.getElementById('clusterLinkBtn');
+      const clusterDropDelete = document.getElementById('clusterDropDelete');
+      const clusterLinkProp = document.getElementById('clusterLinkPropagate');
+      const clusterShowLinkedBtn = document.getElementById('clusterShowLinkedBtn');
+      const shareNear = document.getElementById('shareNear');
+      const shareContains = document.getElementById('shareContains');
+      const shareSame = document.getElementById('shareSame');
+      // Audit pools for autosuggest
+      let mergedSourceItems = [];
+      let deletedRegionItems = [];
+      const clusterUnlinkBtn = document.getElementById('clusterUnlinkBtn');
+
+      const sock = (window.io && window.io()) || null;
+
+      const J = async (url, body, method = 'POST', json = false) => {
+        const r = await fetch(url, {
+          method,
+          headers: body && !json ? { 'Content-Type': 'text/plain' } : { 'Content-Type': 'application/json' },
+          body: body ? (json ? JSON.stringify(body) : String(body)) : undefined,
+        });
+        if (!r.ok) throw new Error(await r.text());
+        return r.headers.get('content-type')?.includes('application/json') ? r.json() : r.text();
+      };
+
+      // Load clusters into dropdowns
+      let clusterList = [];
+      async function loadClusterList() {
+        try {
+          const inc = document.getElementById('showDeleted')?.checked ? '1' : '0';
+          const resp = await fetch(`/global/cluster/list?includeDeleted=${inc}`).then((r) => r.json());
+          clusterList = Array.isArray(resp.clusters) ? resp.clusters : [];
+          const renderSel = (sel) => {
+            if (!sel) return;
+            const active = clusterList.filter((c) => !c.deleted);
+            const deleted = clusterList.filter((c) => c.deleted);
+            let html = '<option>— None —</option>';
+            html += active
+              .map((c) => {
+                const lab = (c.name || c.iri.split(':').pop()) || '';
+                return `<option value="${c.iri}">${lab}</option>`;
+              })
+              .join('');
+            if (deleted.length) {
+              html += '<optgroup label="Deleted">' +
+                deleted
+                  .map((c) => {
+                    const lab = (c.name || c.iri.split(':').pop()) || '';
+                    return `<option value="${c.iri}" style="color:#777;font-style:italic">${lab} [deleted]</option>`;
+                  })
+                  .join('') +
+                '</optgroup>';
+            }
+            sel.innerHTML = html;
+          };
+            renderSel(clusterDD);
+            renderSel(clusterLinkA);
+            renderSel(clusterLinkB);
+          } catch (err) { console.warn('renderSel cluster list', err); }
+        }
+
+      function humanLabel(r) {
+        if (Array.isArray(r.tags) && r.tags.length) return r.tags[0];
+        if (r.metadata?.label) return r.metadata.label;
+        if (r.metadata?.description) return r.metadata.description;
+        return 'region';
+      }
+      function imageNameFromUri(uri) {
+        const m = String(uri || '').match(/^uri:\/\/([^\/\s]+)\//);
+        return m ? m[1] : '';
+      }
+      function getConfidence(r) {
+        if (r.confidence ?? false) return r.confidence;
+        if (r.conf ?? false) return r.conf;
+        if (r.metadata?.confidence ?? false) return r.metadata.confidence;
+        if (r.metadata?.conf ?? false) return r.metadata.conf;
+        return undefined;
+      }
+
+      async function loadGallery() {
+        const arr = await fetch('/images.json').then((r) => r.json());
+        thumbs.innerHTML = '';
+        arr.forEach((im) => {
+          const wrap = document.createElement('div');
+          wrap.style.position = 'relative';
+          const cb = document.createElement('input');
+          cb.type = 'checkbox';
+          cb.style.position = 'absolute';
+          cb.style.zIndex = '10';
+          cb.style.left = '8px';
+          cb.style.top = '8px';
+          cb.dataset.json = im.jsonPath || '';
+          const img = document.createElement('img');
+          img.src = im.thumb;
+          img.alt = im.base;
+          img.title = im.base;
+          wrap.appendChild(img);
+          wrap.appendChild(cb);
+          thumbs.appendChild(wrap);
+        });
+      }
+
+      loadSel.onclick = async () => {
+        const cbs = thumbs.querySelectorAll('input[type="checkbox"]');
+        const sources = Array.from(cbs)
+          .filter((cb) => cb.checked && cb.dataset.json)
+          .map((cb) => cb.dataset.json);
+        if (!sources.length) {
+          alert('Select at least one image with an available manifest');
+          return;
+        }
+        const resp = await J('/global/load', { sources }, 'POST', true);
+        res.innerHTML = `Loaded ${resp.sourcesLoaded} sources • ${resp.regionCount} regions`;
+        // refresh audit autosuggest pools
+        try { await refreshMergedSources(); await refreshDeletedRegions(); } catch (err) { console.warn('refresh sources/deleted regions', err); }
+      };
+
+      let activeTab = 'sparql';
+      function switchTab(which) {
+        const isChat = which === 'chat';
+        tabChat.classList.toggle('active', isChat);
+        tabSparql.classList.toggle('active', !isChat);
+        chat.style.display = isChat ? 'block' : 'none';
+        q.style.display = isChat ? 'none' : 'block';
+        activeTab = isChat ? 'chat' : 'sparql';
+      }
+      tabSparql.onclick = () => switchTab('sparql');
+      tabChat.onclick = () => switchTab('chat');
+
+      clearBtn.onclick = () => {
+        (q.style.display !== 'none' ? q : chat).value = '';
+        res.innerHTML = '';
+        const ctx = collage.getContext('2d');
+        ctx.clearRect(0, 0, collage.width, collage.height);
+      };
+
+      run.onclick = async () => {
+        const startT = performance.now();
+        try { logEvent('global_query_start'); } catch (err) { console.warn('logEvent global_query_start', err); }
+        try {
+          const isChat = chat.style.display === 'block';
+          if (isChat) {
+            if (!sock) throw new Error('socket unavailable');
+            sock.emit('chatAskGlobal', { question: chat.value || '' });
+            return;
+          }
+          const rows = await J('/global/sparql', q.value || '', 'POST');
+          handleRowsAndDraw(rows);
+          try { await refreshMergedSources(); await refreshDeletedRegions(); } catch (err) { console.warn('refresh sources/deleted regions', err); }
+          try { logEvent('global_query_end', { durationMs: performance.now()-startT, rows: (rows||[]).length }); } catch (err) { console.warn('logEvent global_query_end', err); }
+        } catch (e) {
+          alert(e.message || String(e));
+        }
+      };
+
+      // Reload clusters when audit toggle changes so Deleted group reflects it
+      showDeleted?.addEventListener('change', async () => {
+        try { await loadClusterList(); } catch (err) { console.warn('loadClusterList on showDeleted change', err); }
+      });
+
+      // Popup editor wiring (reuse behavior from index page)
+      function setTabPop(name){
+        const t = name === 'chat' ? 'chat' : 'sparql';
+        tabSparqlPop?.classList.toggle('active', t==='sparql');
+        tabChatPop?.classList.toggle('active', t==='chat');
+        if (qPop) qPop.style.display = t==='sparql' ? 'block' : 'none';
+        if (chatPop) chatPop.style.display = t==='chat' ? 'block' : 'none';
+      }
+      tabSparqlPop?.addEventListener('click', ()=> setTabPop('sparql'));
+      tabChatPop?.addEventListener('click', ()=> setTabPop('chat'));
+      queryPopBtn?.addEventListener('click', () => {
+        if (!editorPopup) return;
+        setTabPop(activeTab);
+        if (qPop && q) qPop.value = q.value;
+        if (chatPop && chat) chatPop.value = chat.value;
+        editorPopup.style.display = 'block';
+        editorPopup.style.top = '56px';
+        editorPopup.style.left = '12px';
+        editorPopup.style.right = 'auto';
+        editorPopup.style.bottom = 'auto';
+      });
+      editorClose?.addEventListener('click', () => { if (editorPopup) editorPopup.style.display = 'none'; });
+      let editorSnapPos = 0;
+      editorSnap?.addEventListener('click', () => {
+        if (!editorPopup) return;
+        const off = '12px';
+        editorPopup.style.left = 'auto';
+        editorPopup.style.top = 'auto';
+        editorPopup.style.right = 'auto';
+        editorPopup.style.bottom = 'auto';
+        if (editorSnapPos === 0) { editorPopup.style.top = '56px'; editorPopup.style.right = off; }
+        else if (editorSnapPos === 1) { editorPopup.style.bottom = off; editorPopup.style.right = off; }
+        else if (editorSnapPos === 2) { editorPopup.style.bottom = off; editorPopup.style.left = off; }
+        else { editorPopup.style.top = '56px'; editorPopup.style.left = off; }
+        editorSnapPos = (editorSnapPos + 1) % 4;
+      });
+
+      // Editor popup interactions
+      runPop?.addEventListener('click', async () => {
+        if (!editorPopup) return;
+        if (activeTab === 'sparql') {
+          const query = (qPop?.value || '').trim();
+          if (!query) return;
+          try {
+            const rows = await J('/global/sparql', query, 'POST');
+            handleRowsAndDraw(rows);
+            if (q && qPop) q.value = qPop.value; // sync back
+          } catch (e) {
+            alert(e.message || String(e));
+          }
+        } else {
+          const msg = (chatPop?.value || '').trim();
+          if (!msg) return;
+          if (!sock) return alert('socket unavailable');
+          sock.emit('chatAskGlobal', { question: msg });
+          if (chat && chatPop) chat.value = chatPop.value; // sync back
+        }
+      });
+      clearPop?.addEventListener('click', () => {
+        if (activeTab === 'sparql') { if (qPop) qPop.value = ''; }
+        else { if (chatPop) chatPop.value = ''; }
+      });
+      (function enableEditorPopupInteractions(){
+        if (!editorPopup) return;
+        let dragging = false, resizing = false, ox=0, oy=0, startW=0, startH=0, startX=0, startY=0;
+        const header = editorPopup.querySelector('h3');
+        header?.addEventListener('mousedown', (e) => {
+          if (e.target.closest('button') || e.target.closest('input')) return;
+          dragging = true; ox = e.clientX - (editorPopup.offsetLeft || 0); oy = e.clientY - (editorPopup.offsetTop || 0); e.preventDefault();
+        });
+        const resizer = document.getElementById('editorResizer');
+        resizer?.addEventListener('mousedown', (e) => { const rect = editorPopup.getBoundingClientRect(); resizing = true; startX = e.clientX; startY = e.clientY; startW = rect.width; startH = rect.height; e.preventDefault(); });
+        window.addEventListener('mousemove', (e) => {
+          if (dragging) { editorPopup.style.left = Math.max(0, e.clientX - ox) + 'px'; editorPopup.style.top = Math.max(0, e.clientY - oy) + 'px'; }
+          else if (resizing) { const dx = e.clientX - startX, dy=e.clientY - startY; editorPopup.style.width = Math.max(360, startW + dx) + 'px'; editorPopup.style.height = Math.max(220, startH + dy) + 'px'; }
+        });
+        window.addEventListener('mouseup', () => { dragging=false; resizing=false; });
+      })();
+
+      // Cluster highlight and linking actions
+      clusterDD?.addEventListener('change', () => {
+        try {
+          const iri = clusterDD.value;
+          const ctx = collage.getContext('2d');
+          ctx.clearRect(0, 0, collage.width, collage.height);
+          drawCollage(lastRegions);
+          const c = (clusterList || []).find((x) => x.iri === iri);
+          if (!c) return;
+          const members = new Set(c.members || []);
+          const accent = getComputedStyle(document.documentElement).getPropertyValue('--accent').trim() || '#4f8cff';
+          lastLayout.forEach((cell) => {
+            if (members.has(cell.uri)) {
+              ctx.save();
+              ctx.strokeStyle = accent;
+              ctx.lineWidth = 3;
+              ctx.strokeRect(cell.x + 2, cell.y + 2, cell.w - 4, cell.h - 4);
+              ctx.restore();
+            }
+          });
+        } catch (err) { console.warn('cluster highlight error', err); }
+      });
+      clusterDetailsBtn?.addEventListener('click', () => {
+        const iri = clusterDD.value;
+        if (!iri || iri === '— None —') return;
+        relUI.openFor(iri);
+      });
+      clusterLinkBtn?.addEventListener('click', async () => {
+        try {
+          const a = clusterLinkA.value, b = clusterLinkB.value;
+          if (!a || !b || a === '— None —' || b === '— None —') throw new Error('Pick two clusters');
+          const predicate = clusterLinkPred.value || 'clusterLinkedTo';
+          const name = (clusterLinkName.value || '').trim();
+          const propagate = !!(clusterLinkProp?.checked);
+          const sharePreds = [];
+          if (shareNear?.checked) sharePreds.push('near');
+          if (shareContains?.checked) sharePreds.push('contains');
+          if (shareSame?.checked) sharePreds.push('sameObjectAs');
+          try { logEvent('cluster_link', { a, b, predicate, hasName: !!name, propagate, sharePreds }); } catch (err) { console.warn('logEvent cluster_link', err); }
+          await J('/global/cluster/link', { a, b, predicate, name, propagate, sharePreds }, 'POST', true);
+          clusterLinkName.value = '';
+          alert('Clusters linked');
+        } catch (e) {
+          alert(e.message || String(e));
+        }
+      });
+
+      // Delete (soft-delete) link between two clusters
+      clusterUnlinkBtn?.addEventListener('click', async () => {
+        try {
+          const a = clusterLinkA.value, b = clusterLinkB.value;
+          if (!a || !b || a === '— None —' || b === '— None —') throw new Error('Pick two clusters');
+          const predicate = clusterLinkPred.value || 'clusterLinkedTo';
+          try { logEvent('cluster_unlink', { a, b, predicate }); } catch (err) { console.warn('logEvent cluster_unlink', err); }
+          await J('/global/cluster/link', { a, b, predicate, enabled: false }, 'POST', true);
+          alert('Link deleted');
+        } catch (e) {
+          alert(e.message || String(e));
+        }
+      });
+
+      clusterShowLinkedBtn?.addEventListener('click', async () => {
+        try {
+          const iri = clusterDD.value;
+          if (!iri || iri === '— None —') throw new Error('Pick a cluster');
+          try { logEvent('cluster_show_linked', { cluster: iri }); } catch (err) { console.warn('logEvent cluster_show_linked', err); }
+          // highlight selected cluster and any clusters linked via active edges
+          // relationships popup source already lists cluster links; Can fetch relationships and collect other clusters
+          const rels = await fetch(`/relationships?global=1&uri=${encodeURIComponent(iri)}`).then((r)=>r.json());
+          const linked = new Set([iri]);
+          for (const r of rels) {
+            if (!r.deleted && (r.predicate.endsWith('#clusterLinkedTo') || r.predicate.endsWith('#sameObjectAs') || r.predicate.endsWith('#near') || r.predicate.endsWith('#contains'))) linked.add(r.other);
+          }
+          const members = new Set();
+          for (const c of clusterList) {
+            if (linked.has(c.iri)) (c.members||[]).forEach((u)=>members.add(u));
+          }
+          const ctx = collage.getContext('2d');
+          ctx.clearRect(0, 0, collage.width, collage.height);
+          drawCollage(lastRegions);
+          const accent = getComputedStyle(document.documentElement).getPropertyValue('--accent').trim() || '#4f8cff';
+          lastLayout.forEach((cell) => {
+            if (members.has(cell.uri)) {
+              ctx.save();
+              ctx.strokeStyle = accent;
+              ctx.lineWidth = 3;
+              ctx.strokeRect(cell.x + 2, cell.y + 2, cell.w - 4, cell.h - 4);
+              ctx.restore();
+            }
+          });
+
+          // Also render a summary table into the Relationships popup
+          const selected = clusterList.find((x)=>x.iri===iri);
+          const clusterRows = rels.filter((r)=>!r.deleted).map((r)=>({ pred:r.predicate, other:r.other, name:r.name||'', desc:r.description||'' }));
+          // Build SPARQL query for region-level relations among union members
+          const md = 'http://example.org/metadata#';
+          const urisVals = [...members].map(u=>`<${u}>`).join(' ');
+          const predVals = [`<${md}near>`,`<${md}contains>`,`<${md}sameObjectAs>`].join(' ');
+          const sparql = `SELECT ?s ?p ?o WHERE { VALUES ?s { ${urisVals} } VALUES ?o { ${urisVals} } VALUES ?p { ${predVals} } ?s ?p ?o . } LIMIT 200`;
+          let regionRows = [];
+          try { regionRows = await J('/global/sparql', sparql, 'POST', true); } catch (err) { console.warn('fetch region rows', err); }
+          const box = document.getElementById('resultsPopup');
+          const body = document.getElementById('relPopupBody');
+          if (box && body) {
+            const head = `<h3 style="display:flex;align-items:center;justify-content:space-between;gap:8px"><span>Linked Clusters</span><button id="relPopClose" class="btn-ghost btn-sm" title="Close">✕</button></h3>`;
+            const ctable = `<div style="margin:6px 0 8px;font-weight:600">Cluster links for ${selected?.name || iri}</div><table class="data"><thead><tr><th>Predicate</th><th>Other cluster</th><th>Name</th><th>Description</th></tr></thead><tbody>${clusterRows.map(r=>`<tr><td>${r.pred}</td><td>${r.other}</td><td>${r.name}</td><td>${r.desc}</td></tr>`).join('')}</tbody></table>`;
+            const rtable = `<div style="margin:10px 0 6px;font-weight:600">Region relationships within linked clusters</div><table class="data"><thead><tr><th>Predicate</th><th>Subject</th><th>Object</th></tr></thead><tbody>${(regionRows||[]).map(r=>`<tr><td>${r.p}</td><td>${r.s}</td><td>${r.o}</td></tr>`).join('')}</tbody></table>`;
+            body.innerHTML = ctable + rtable;
+            box.style.display = 'block';
+            // Position near top-right like relationships
+            const rect = box.getBoundingClientRect();
+            box.style.left = rect.left ? rect.left + 'px' : 'auto';
+            box.style.top = '56px';
+            box.style.right = '12px';
+            box.style.bottom = 'auto';
+          }
+        } catch (e) { alert(e.message || String(e)); }
+      });
+
+      clusterDropDelete?.addEventListener('click', async () => {
+        try {
+          const iri = clusterDD.value;
+          if (!iri || iri === '— None —') throw new Error('Pick a cluster first');
+          await J('/global/cluster/delete', { cluster: iri }, 'POST', true);
+          await loadClusterList();
+          // redraw to clear highlight and reflect membership changes
+          const ctx = collage.getContext('2d');
+          ctx.clearRect(0, 0, collage.width, collage.height);
+          drawCollage(lastRegions);
+          alert('Cluster deleted (soft)');
+        } catch (e) {
+          alert(e.message || String(e));
+        }
+      });
+
+      function collectUrisFromRows(rows) {
+        const uris = new Set();
+        rows.forEach((r) => {
+          if (r.r) uris.add(r.r);
+          if (r.s) uris.add(r.s);
+          if (r.o) uris.add(r.o);
+        });
+        return Array.from(uris);
+      }
+
+      let lastRows = [];
+      async function handleRowsAndDraw(rows) {
+        lastRows = rows || [];
+        res.innerHTML = '';
+        if (!Array.isArray(rows) || !rows.length) {
+          res.textContent = 'No results';
+          const ctx = collage.getContext('2d');
+          ctx.clearRect(0, 0, collage.width, collage.height);
+          return;
+        }
+        const uris = collectUrisFromRows(rows);
+        const { regions } = await J('/global/regions', { uris }, 'POST', true);
+        const showDel = !!(showDeleted?.checked);
+        const regionsEff = Array.isArray(regions)
+          ? (showDel ? regions : regions.filter((r) => !r?.metadata?.deleted))
+          : [];
+        // Build suggestions for manual search like viewer
+        try {
+          const dl = document.getElementById('uriSuggGlobal');
+          if (dl) {
+            dl.innerHTML = '';
+            const seen = new Set();
+            (regionsEff || []).forEach((r) => {
+              const u = r?.metadata?.uri || '';
+              if (!u || seen.has(u)) return;
+              const lab = humanLabel(r);
+              const opt = document.createElement('option');
+              opt.value = u;
+              opt.textContent = `${lab} — ${u}`;
+              dl.appendChild(opt);
+              seen.add(u);
+            });
+          }
+        } catch (err) { console.warn('build URI suggestions', err); }
+        await loadClusterList();
+        const nameByUri = (() => {
+          const m = Object.create(null);
+          for (const c of clusterList) {
+            for (const u of c.members || []) m[u] = c.name || '';
+          }
+          return m;
+        })();
+        // If arranging by cluster, fetch grouping
+        const arrange = document.getElementById('arrangeBy')?.value || 'none';
+        if (arrange === 'cluster') {
+          try {
+            const resp = await J('/global/clusters', { uris }, 'POST', true);
+            const gmap = Object.create(null);
+            (resp.groups || []).forEach((g) => (g.uris || []).forEach((u) => (gmap[u] = g.id)));
+            drawCollage(regionsEff || [], gmap);
+          } catch (_) { drawCollage(regionsEff || []); }
+        } else {
+          drawCollage(regionsEff || []);
+        }
+        // Results table with Named Cluster column
+        try {
+          const rowsHtml = (regionsEff || []).map((r) => {
+            const u = r?.metadata?.uri || '';
+            const label = humanLabel(r);
+            const img = imageNameFromUri(u);
+            const cname = nameByUri[u] || '';
+            return `<tr><td>${label}</td><td>${img}</td><td>${cname}</td></tr>`;
+          }).join('');
+          res.innerHTML = `<table class="data"><thead><tr><th>Region</th><th>Image</th><th>Named Cluster</th></tr></thead><tbody>${rowsHtml}</tbody></table>`;
+        } catch (err) { console.warn('render results table', err); }
+      }
+
+      let lastLayout = [];
+      let lastRegions = [];
+      function getStoredBlur() {
+        try {
+          const v = localStorage.getItem('settings.blur');
+          return v == null ? true : v === '1';
+        } catch {
+          return true;
+        }
+      }
+      function drawCollage(regions, grouping) {
+        lastRegions = regions.slice();
+        const pad = 10, gap = 12, cols = 4;
+        const cellW = 240, cellH = 200, groupHead = 22;
+        const ctx = collage.getContext('2d');
+        const arrange = (document.getElementById('arrangeBy')?.value) || 'none';
+        // Group regions per arrange mode
+        const groups = (() => {
+          if (arrange === 'image') {
+            const by = new Map();
+            regions.forEach((r) => {
+              const img = imageNameFromUri(r?.metadata?.uri);
+              if (!by.has(img)) by.set(img, []);
+              by.get(img).push(r);
+            });
+            return Array.from(by.entries()).map(([k, items]) => ({ key: k, items }));
+          }
+          if (arrange === 'tag') {
+            const by = new Map();
+            regions.forEach((r) => {
+              const tag = (r.tags && r.tags[0]) || 'region';
+              if (!by.has(tag)) by.set(tag, []);
+              by.get(tag).push(r);
+            });
+            return Array.from(by.entries()).map(([k, items]) => ({ key: k, items }));
+          }
+          if (arrange === 'predicate') {
+            // Build a predicate map from lastRows (pairs queries)
+            const pm = new Map();
+            (lastRows || []).forEach((r) => {
+              const p = r.pred || r.p || r.predicate || r['?pred'] || r.pred0 || null;
+              const u = r.r || r.s || r.o || null;
+              if (p && u) pm.set(u, p);
+            });
+            const by = new Map();
+            regions.forEach((r) => {
+              const u = r?.metadata?.uri || '';
+              const key = pm.get(u) || '(none)';
+              if (!by.has(key)) by.set(key, []);
+              by.get(key).push(r);
+            });
+            return Array.from(by.entries()).map(([k, items]) => ({ key: k, items }));
+          }
+          if (arrange === 'cluster' && grouping) {
+            const by = new Map();
+            regions.forEach((r) => {
+              const u = r?.metadata?.uri || '';
+              const key = grouping[u] || u;
+              if (!by.has(key)) by.set(key, []);
+              by.get(key).push(r);
+            });
+            return Array.from(by.entries()).map(([k, items]) => ({ key: k, items }));
+          }
+          return [{ key: '', items: regions }];
+        })();
+
+        const W = cols * (cellW + gap) + gap;
+        let H = gap;
+        groups.forEach((g) => {
+          const rows = Math.ceil(g.items.length / cols);
+          H += (arrange === 'none' ? 0 : groupHead) + rows * (cellH + gap) + gap;
+        });
+        collage.width = W;
+        collage.height = H;
+        ctx.clearRect(0, 0, W, H); // let CSS theme background show through
+        lastLayout = [];
+
+        const isLight = document.body.classList.contains('theme-light');
+        const panelFill = isLight ? '#f3f6fb' : '#121826';
+        const panelStroke = isLight ? '#cfd9e6' : '#1f2a44';
+        const textColor = isLight ? '#0b1220' : '#eaf2ff';
+
+        let yCursor = gap;
+        groups.forEach((g) => {
+          if (arrange !== 'none') {
+            ctx.fillStyle = textColor;
+            ctx.font = '12px Inter, system-ui, sans-serif';
+            ctx.textBaseline = 'top';
+            ctx.fillText(g.key || '', gap, yCursor);
+            yCursor += groupHead;
+          }
+          g.items.forEach((r, i) => {
+            const col = i % cols;
+            const row = Math.floor(i / cols);
+            const x0 = gap + col * (cellW + gap);
+            const y0 = yCursor + row * (cellH + gap);
+            const cell = { x: x0, y: y0, w: cellW, h: cellH, uri: r?.metadata?.uri || '', idx: i };
+            lastLayout.push(cell);
+
+            // Panel background
+            ctx.fillStyle = panelFill;
+            ctx.strokeStyle = panelStroke;
+            ctx.lineWidth = 1;
+            ctx.fillRect(x0, y0, cellW, cellH);
+            ctx.strokeRect(x0, y0, cellW, cellH);
+
+            // Region crop
+            const imgEl = new Image();
+            const size = 220; // target max inside cell
+            imgEl.onload = () => {
+              const availW = cellW - pad * 2;
+              const availH = cellH - pad * 2 - 28;
+              const s = Math.min(availW / imgEl.naturalWidth, availH / imgEl.naturalHeight);
+              const dw = imgEl.naturalWidth * s;
+              const dh = imgEl.naturalHeight * s;
+              const dx = x0 + pad + (availW - dw) / 2;
+              const dy = y0 + pad + (availH - dh) / 2;
+              ctx.drawImage(imgEl, dx, dy, dw, dh);
+              // border overlay
+              ctx.strokeStyle = (r.tags && r.tags[0]) === 'person' ? 'red' : '#4f8cff';
+              ctx.lineWidth = 2;
+              ctx.strokeRect(dx, dy, dw, dh);
+            };
+            const blurParam = getStoredBlur() ? '&blur=1' : '&blur=0';
+            imgEl.src = `/global/crop?uri=${encodeURIComponent(cell.uri)}&size=${size}${blurParam}`;
+
+            // Title
+            const label = humanLabel(r);
+            const conf = getConfidence(r);
+            const img = imageNameFromUri(r?.metadata?.uri);
+            const title = `${label}${conf != null ? ` (${(+conf).toFixed(2)})` : ''} · ${img}`;
+            ctx.fillStyle = textColor;
+            ctx.font = '12px Inter, system-ui, sans-serif';
+            ctx.textBaseline = 'top';
+            ctx.fillText(title, x0 + pad, y0 + cellH - pad - 14);
+            // Draw badge if staged for cluster
+            if (clusterSet.has(cell.uri)) {
+              const accent = getComputedStyle(document.documentElement).getPropertyValue('--accent').trim() || '#4f8cff';
+              ctx.save();
+              ctx.fillStyle = accent;
+              ctx.beginPath();
+              ctx.arc(x0 + 10, y0 + 10, 6, 0, Math.PI * 2);
+              ctx.fill();
+              ctx.restore();
+            }
+
+            // Deleted badge
+            if (r?.metadata?.deleted) {
+              const badgeText = 'deleted';
+              ctx.save();
+              ctx.font = '10px Inter, system-ui, sans-serif';
+              ctx.textBaseline = 'top';
+              const tw = Math.ceil(ctx.measureText(badgeText).width);
+              const bw = tw + 10, bh = 16;
+              const bx = x0 + pad, by = y0 + pad;
+              ctx.fillStyle = '#b91c1c';
+              ctx.fillRect(bx, by, bw, bh);
+              ctx.strokeStyle = 'rgba(0,0,0,0.35)';
+              ctx.strokeRect(bx, by, bw, bh);
+              ctx.fillStyle = '#fff';
+              ctx.fillText(badgeText, bx + 5, by + 3);
+              ctx.restore();
+            }
+          });
+          const rows = Math.ceil(g.items.length / cols);
+          yCursor += rows * (cellH + gap) + gap;
+        });
+
+        // Build Pick URI dropdown – mirror viewer: active + Deleted group (when enabled)
+        try {
+          const showDel = !!(showDeleted?.checked);
+          const active = (regions || []).filter((r)=> !r?.metadata?.deleted);
+          const deleted = showDel ? (regions || []).filter((r)=> !!r?.metadata?.deleted) : [];
+          const activeUris = new Set(active.map((r)=> r?.metadata?.uri).filter(Boolean));
+          let html = '<option>— None —</option>';
+          html += active.map((r)=>{
+            const u = r?.metadata?.uri || '';
+            const label = (r.tags && r.tags[0]) || r?.metadata?.label || 'region';
+            const txt = `${label} · ${u}`;
+            return `<option value="${u}">${txt}</option>`;
+          }).join('');
+          if (deleted.length) {
+            html += '<optgroup label="Deleted">' + deleted.map((r)=>{
+              const u = r?.metadata?.uri || '';
+              if (!u || activeUris.has(u)) return '';
+              const label = (r.tags && r.tags[0]) || r?.metadata?.label || 'region';
+              const txt = `${label} — ${u} (deleted)`;
+              return `<option value="${u}" style="color:#777;font-style:italic">${txt}</option>`;
+            }).join('') + '</optgroup>';
+          }
+          uriDD.innerHTML = html;
+        } catch (err) { console.warn('build URI dropdown', err); }
+      }
+
+      // Selection + linking + relationship popup
+      function cellAt(x, y) {
+        return lastLayout.find((c) => x >= c.x && x <= c.x + c.w && y >= c.y && y <= c.y + c.h) || null;
+      }
+      let pickA = null, pickB = null;
+      const clusterSet = new Set();
+      let currentSel = null;
+      collage.addEventListener('click', (e) => {
+        const rect = collage.getBoundingClientRect();
+        const x = e.clientX - rect.left;
+        const y = e.clientY - rect.top;
+        const hit = cellAt(x, y);
+        if (!hit) return;
+        // SHIFT-click toggles cluster staging and redraws
+        if (e.shiftKey) {
+          if (clusterSet.has(hit.uri)) clusterSet.delete(hit.uri); else clusterSet.add(hit.uri);
+          clusterCount.textContent = 'Cluster: ' + clusterSet.size;
+          const ctx2 = collage.getContext('2d');
+          ctx2.clearRect(0, 0, collage.width, collage.height);
+          drawCollage(lastRegions);
+          return;
+        }
+        // Single-click opens relationships and sets current selection
+        currentSel = hit; // store for Esc-clearing
+        // Clear previous highlight by redrawing
+        const ctx = collage.getContext('2d');
+        ctx.clearRect(0, 0, collage.width, collage.height);
+        drawCollage(lastRegions);
+        if (!pickA || (pickA && pickB)) { pickA = hit; pickB = null; relUI.openFor(hit.uri); }
+        else if (!pickB && hit.uri !== pickA.uri) { pickB = hit; }
+        selA.value = pickA ? pickA.uri : '';
+        selB.value = pickB ? pickB.uri : '';
+        // Visual cue: simple border highlight
+        [pickA, pickB].filter(Boolean).forEach((p) => {
+          ctx.save();
+          ctx.strokeStyle = '#f59e0b';
+          ctx.lineWidth = 3;
+          ctx.strokeRect(p.x + 2, p.y + 2, p.w - 4, p.h - 4);
+          ctx.restore();
+        });
+      });
+
+      // Escape clears selection and closes popup
+      window.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') {
+          const ctx = collage.getContext('2d');
+          ctx.clearRect(0,0,collage.width,collage.height);
+          drawCollage(lastRegions);
+          currentSel = null; pickA = null; pickB = null; selA.value=''; selB.value='';
+          const box = document.getElementById('resultsPopup');
+          if (box) box.style.display='none';
+        }
+      });
+
+      linkBtn.onclick = async () => {
+        try {
+          if (!pickA || !pickB) throw new Error('Pick A and B');
+          const body = { relation: relType.value, uriA: pickA.uri, uriB: pickB.uri };
+          if (relName.value.trim()) body.name = relName.value.trim();
+          try { logEvent('global_link', { relation: relType.value, uriA: pickA.uri, uriB: pickB.uri, hasName: !!(relName.value||'').trim() }); } catch (err) { console.warn('logEvent global_link', err); }
+          const resp = await J('/global/rel', body, 'POST', true);
+          alert('Linked!');
+          // Refresh relationships popup for A
+          if (pickA) relUI.openFor(pickA.uri);
+        } catch (e) {
+          alert(e.message || String(e));
+        }
+      };
+
+      // Cluster controls
+      const clusterCount = document.getElementById('clusterCount');
+      document.getElementById('clusterAddBtn').onclick = () => {
+        if (currentSel?.uri) {
+          clusterSet.add(currentSel.uri);
+          clusterCount.textContent = 'Cluster: ' + clusterSet.size;
+          try { logEvent('cluster_add_stage', { uri: currentSel.uri, size: clusterSet.size }); } catch (err) { console.warn('logEvent cluster_add_stage', err); }
+        }
+      };
+      document.getElementById('clusterRunBtn').onclick = async () => {
+        try {
+          const uris = Array.from(clusterSet);
+          if (uris.length < 2) throw new Error('Add at least 2 items');
+          const name = (clusterNameInput.value || '').trim();
+          try { logEvent('cluster_create', { n: uris.length, hasName: !!name }); } catch (err) { console.warn('logEvent cluster_create', err); }
+          await J('/global/cluster', { uris, propagate: true, name }, 'POST', true);
+          clusterSet.clear(); clusterCount.textContent = 'Cluster: 0';
+          clusterNameInput.value = '';
+          // If arrange is cluster, refresh collage grouping
+          const arrange = document.getElementById('arrangeBy')?.value || 'none';
+          if (arrange === 'cluster' && lastRegions.length) {
+            const allUris = lastRegions.map((r) => r?.metadata?.uri).filter(Boolean);
+            try {
+              const resp = await J('/global/clusters', { uris: allUris }, 'POST', true);
+              const gmap = Object.create(null);
+              (resp.groups || []).forEach((g) => (g.uris || []).forEach((u) => (gmap[u] = g.id)));
+              drawCollage(lastRegions, gmap);
+              } catch (err) { console.warn('cluster redraw', err); }
+          }
+          await loadClusterList();
+          if (currentSel) relUI.openFor(currentSel.uri);
+        } catch (e) {
+          alert(e.message || String(e));
+        }
+      };
+
+      document.getElementById('clusterDelBtn').onclick = async () => {
+        try {
+          const uris = Array.from(clusterSet);
+          if (uris.length < 2) throw new Error('Add at least 2 items to delete cluster');
+          try { logEvent('cluster_delete', { n: uris.length }); } catch (err) { console.warn('logEvent cluster_delete', err); }
+          await J('/global/uncluster', { uris }, 'POST', true);
+          clusterSet.clear(); clusterCount.textContent = 'Cluster: 0';
+          const arrange = document.getElementById('arrangeBy')?.value || 'none';
+          if (arrange === 'cluster' && lastRegions.length) {
+            const allUris = lastRegions.map((r) => r?.metadata?.uri).filter(Boolean);
+            try {
+              const resp = await J('/global/clusters', { uris: allUris }, 'POST', true);
+              const gmap = Object.create(null);
+              (resp.groups || []).forEach((g) => (g.uris || []).forEach((u) => (gmap[u] = g.id)));
+              drawCollage(lastRegions, gmap);
+              } catch (err) { console.warn('cluster redraw', err); }
+          }
+          await loadClusterList();
+          if (currentSel) relUI.openFor(currentSel.uri);
+        } catch (e) {
+          alert(e.message || String(e));
+        }
+      };
+
+      // Relationships UI module wiring
+      const relUI = attachRelationshipsUI({
+        sock,
+        fetchRelationships: async (uri) => {
+          // Base rows for the URI itself
+          const base = await fetch('/relationships?global=1&uri=' + encodeURIComponent(uri)).then((r) => r.json());
+          // If this URI refers to a cluster (present in clusterList), merge member relationships (readonly)
+          const c = (clusterList || []).find((x) => x.iri === uri);
+          if (!c) {
+            // If the subject is a deleted region, show its relations as deleted + readonly for audit
+            let subjectDeleted = false;
+            try {
+              const resp = await J('/global/regions', { uris: [uri] }, 'POST', true);
+              const reg = Array.isArray(resp?.regions) ? resp.regions.find((r)=> (r?.metadata?.uri === uri)) : null;
+              subjectDeleted = !!(reg?.metadata?.deleted);
+            } catch (err) { console.warn('load region metadata', err); }
+            if (subjectDeleted) {
+              const toDeleted = (p) => {
+                if (p.endsWith('#near')) return 'http://example.org/metadata#deletedNear';
+                if (p.endsWith('#contains')) return 'http://example.org/metadata#deletedContains';
+                if (p.endsWith('#sameObjectAs')) return 'http://example.org/metadata#deletedSameObjectAs';
+                if (p.endsWith('#clusterLinkedTo')) return 'http://example.org/metadata#deletedClusterLinkedTo';
+                return p;
+              };
+              return base.map((r) => ({
+                ...r,
+                predicate: toDeleted(r.predicate),
+                deleted: true,
+                readonly: true,
+                name: r.name || '',
+                description: r.description || '',
+              }));
+            }
+            return base.map((r) => ({ ...r, readonly: false, name: r.name || '', description: r.description || '' }));
+          }
+          const members = Array.isArray(c.members) ? c.members.slice() : [];
+          const memberRows = [];
+          for (const m of members) {
+            try {
+              const rows = await fetch('/relationships?global=1&uri=' + encodeURIComponent(m)).then((r) => r.json());
+              rows.forEach((r) => memberRows.push({ ...r, readonly: true }));
+              } catch (err) { console.warn('fetch member relationships', err); }
+          }
+          // Deduplicate by predicate+other+incoming+deleted
+          const key = (r) => `${r.predicate}|${r.other}|${r.incoming?'1':'0'}|${r.deleted?'1':'0'}`;
+          const map = new Map();
+          base.forEach((r) => map.set(key(r), { ...r, readonly: false }));
+          memberRows.forEach((r) => { if (!map.has(key(r))) map.set(key(r), r); });
+          return Array.from(map.values()).map((r) => ({ ...r, name: r.name || '', description: r.description || '' }));
+        },
+        onToggle: ({ subject, predicate, object, enabled }) => sock?.emit('toggleRelationshipGlobal', { subject, predicate, object, enabled }),
+        onMetaSave: ({ subject, predicate, object, name, description }) => sock?.emit('updateRelationshipMetaGlobal', { subject, predicate, object, name, description }),
+        containerId: 'resultsPopup',
+        bodyId: 'relPopupBody'
+      });
+
+      // Pick URI dropdown & manual input
+      uriDD.addEventListener('change', () => {
+        const u = uriDD.value;
+        if (!u || u === '— None —') return;
+        relUI.openFor(u);
+      });
+      function maybeOpenFor(value) {
+        const v = (value || '').trim();
+        if (!v) return;
+        // If it looks like a region URI or cluster IRI, open relationships and try to persist highlight
+        relUI.openFor(v);
+        const ctx = collage.getContext('2d');
+        ctx.clearRect(0,0,collage.width,collage.height);
+        drawCollage(lastRegions);
+      }
+      uriManual.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') maybeOpenFor(uriManual.value);
+      });
+      uriManual.addEventListener('change', () => maybeOpenFor(uriManual.value));
+      uriManual.addEventListener('input', (e) => {
+        // If user chooses a datalist option, some browsers only fire input.
+        // Open immediately when value matches an existing URI.
+        const v = uriManual.value.trim();
+        if (!v) return;
+        const hit = lastRegions.find((r)=>r?.metadata?.uri===v);
+        if (hit) {
+          maybeOpenFor(v);
+        }
+      });
+
+      // Voice recording → socket → LLM → SPARQL → results
+      recBtn.onclick = async () => {
+        if (!sock) return alert('socket unavailable');
+        try {
+          if (!navigator.mediaDevices?.getUserMedia) throw new Error('No mic API');
+          const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const selA = document.getElementById('selA');
+      const selB = document.getElementById('selB');
+      const relType = document.getElementById('relType');
+      const linkBtn = document.getElementById('linkBtn');
+      const relName = document.getElementById('relName');
+          const mediaRecorder = new MediaRecorder(stream);
+          const chunks = [];
+          mediaRecorder.ondataavailable = (e) => chunks.push(e.data);
+          mediaRecorder.onstop = async () => {
+            const blob = new Blob(chunks, { type: 'audio/webm' });
+            const buf = await blob.arrayBuffer();
+            const b64 = btoa(String.fromCharCode(...new Uint8Array(buf)));
+            sock.emit('voiceBlobGlobal', { wavBase64: b64 });
+          };
+          mediaRecorder.start();
+          recBtn.textContent = '⏹ Stop';
+          const stop = () => {
+            mediaRecorder.stop();
+            recBtn.textContent = '🎤 Speak';
+            window.removeEventListener('keydown', onEsc);
+          };
+          const onEsc = (ev) => ev.key === 'Escape' && stop();
+          window.addEventListener('keydown', onEsc);
+          recBtn.onclick = stop;
+        } catch (e) {
+          alert(e.message || String(e));
+        }
+      };
+
+      if (sock) {
+  function logEvent(type, detail={}){ try { fetch('/ux/event',{ method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ type, detail, ts: Date.now() }) }); } catch (err) { console.warn('logEvent network', err); } }
+        sock.on('sparqlOkGlobal', ({ rows, rawAnswer, sparql }) => {
+          if (rawAnswer) console.info('LLM:', rawAnswer);
+          if (typeof sparql === 'string' && q) q.value = sparql; // mirror viewer behavior
+          handleRowsAndDraw(rows || []);
+          // refresh audit suggestion pools
+          refreshMergedSources().catch(()=>{});
+          refreshDeletedRegions().catch(()=>{});
+        });
+        sock.on('sparqlErrGlobal', (msg) => alert(msg));
+        // Live updates: clusters & regions
+        sock.on('clustersChanged', async () => {
+          try {
+            await loadClusterList();
+            // Redraw collage if we have regions shown (preserve grouping)
+            if (Array.isArray(lastRegions) && lastRegions.length) {
+              const arrange = document.getElementById('arrangeBy')?.value || 'none';
+              if (arrange === 'cluster') {
+                try {
+                  const allUris = lastRegions.map((r) => r?.metadata?.uri).filter(Boolean);
+                  const resp = await J('/global/clusters', { uris: allUris }, 'POST', true);
+                  const gmap = Object.create(null);
+                  (resp.groups || []).forEach((g) => (g.uris || []).forEach((u) => (gmap[u] = g.id)));
+                  drawCollage(lastRegions, gmap);
+                } catch (err) { console.warn('clustersChanged redraw', err); drawCollage(lastRegions); }
+              } else {
+                drawCollage(lastRegions);
+              }
+            }
+            } catch (err) { console.warn('clustersChanged handler', err); }
+        });
+        sock.on('regionsChanged', async () => {
+          try {
+            // When regions change (create/delete/update), redraw collage if results are shown
+            if (Array.isArray(lastRegions) && lastRegions.length) {
+              const arrange = document.getElementById('arrangeBy')?.value || 'none';
+              if (arrange === 'cluster') {
+                try {
+                  const allUris = lastRegions.map((r) => r?.metadata?.uri).filter(Boolean);
+                  const resp = await J('/global/clusters', { uris: allUris }, 'POST', true);
+                  const gmap = Object.create(null);
+                  (resp.groups || []).forEach((g) => (g.uris || []).forEach((u) => (gmap[u] = g.id)));
+                  drawCollage(lastRegions, gmap);
+                  } catch (err) { console.warn('regionsChanged redraw', err); drawCollage(lastRegions); }
+              } else {
+                drawCollage(lastRegions);
+              }
+            }
+            } catch (err) { console.warn('regionsChanged handler', err); }
+        });
+      }
+
+      // Kick off
+      loadGallery();
+      loadClusterList();
+      // Starter query
+      q.value = `PREFIX md: <http://example.org/metadata#>\nSELECT ?r WHERE { ?r md:tags "person" } LIMIT 24`;
+
+      // Settings – theme + accent (copy from viewer)
+      function hexShade(hex, amt) {
+        let col = hex.replace('#', '');
+        if (col.length === 3) col = col.split('').map((c) => c + c).join('');
+        const num = parseInt(col, 16);
+        let r = (num >> 16) + amt;
+        let g = ((num >> 8) & 0x00ff) + amt;
+        let b = (num & 0x0000ff) + amt;
+        r = Math.max(0, Math.min(255, r));
+        g = Math.max(0, Math.min(255, g));
+        b = Math.max(0, Math.min(255, b));
+        return `#${(1 << 24 | (r << 16) | (g << 8) | b).toString(16).slice(1)}`;
+      }
+      function applyAccent(hex) {
+        if (!/^#([0-9a-f]{3}|[0-9a-f]{6})$/i.test(hex)) return;
+        const dark = hexShade(hex, -25);
+        document.documentElement.style.setProperty('--accent', hex);
+        document.documentElement.style.setProperty('--accent-2', dark);
+        try { localStorage.setItem('settings.accent', hex); } catch (err) { console.warn('localStorage set accent', err); }
+      }
+      function applyTheme(mode) {
+        const m = mode || localStorage.getItem('settings.theme') || 'system';
+        if (m === 'system') {
+          const prefersLight = window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches;
+          document.body.classList.toggle('theme-light', !!prefersLight);
+        } else {
+          document.body.classList.toggle('theme-light', m === 'light');
+        }
+        try { localStorage.setItem('settings.theme', m); } catch (err) { console.warn('localStorage set theme', err); }
+        return m;
+      }
+      applyTheme();
+      // open/close settings panel
+      settingsBtn.addEventListener('click', () => {
+        const p = document.getElementById('settingsPanel');
+        p.style.display = p.style.display === 'none' ? 'block' : 'none';
+        // place near top-right under top bar
+        p.style.position = 'absolute'; p.style.top = '56px'; p.style.right = '12px'; p.style.zIndex = 2000; p.classList.add('panel');
+      });
+      document.getElementById('settingsCancel').addEventListener('click', () => {
+        document.getElementById('settingsPanel').style.display = 'none';
+      });
+      // Blur preference (reused from viewer, default on)
+      const settingsBlur = document.getElementById('settingsBlur');
+      let blurOn = true;
+      function applyBlurPref(on) {
+        blurOn = !!on;
+        if (settingsBlur) settingsBlur.checked = blurOn;
+        try { localStorage.setItem('settings.blur', blurOn ? '1' : '0'); } catch (err) { console.warn('localStorage set blur', err); }
+        try { logEvent('blur_pref', { on: !!blurOn }); } catch (err) { console.warn('logEvent blur_pref', err); }
+        // redraw collage to reflect
+        if (lastRegions.length) drawCollage(lastRegions);
+      }
+      (function initBlurPref(){
+        let v=null; try { v = localStorage.getItem('settings.blur'); } catch (err) { console.warn('localStorage get blur', err); }
+        applyBlurPref(v==null ? true : v === '1');
+      })();
+      settingsBlur?.addEventListener('change', () => applyBlurPref(settingsBlur.checked));
+      document.getElementById('settingsSave').addEventListener('click', () => {
+        const t = document.getElementById('settingsTheme').value || 'system';
+        applyTheme(t);
+        const acc = document.getElementById('settingsAccent').value || '#4f8cff';
+        applyAccent(acc);
+        document.getElementById('settingsPanel').style.display = 'none';
+      });
+
+      // Reopen relationships popup and redraw results to respect showDeleted
+      showDeleted.addEventListener('change', async () => {
+        if (currentSel) relUI.openFor(currentSel.uri);
+        await loadClusterList();
+        if (Array.isArray(lastRows) && lastRows.length) handleRowsAndDraw(lastRows);
+        if (showDeleted?.checked) { refreshMergedSources().catch(()=>{}); refreshDeletedRegions().catch(()=>{}); }
+      });
+
+      // Arrange by → redraw
+      document.getElementById('arrangeBy').addEventListener('change', async () => {
+        if (!lastRegions.length) return;
+        const arrange = document.getElementById('arrangeBy')?.value || 'none';
+        if (arrange === 'cluster') {
+          try {
+            const allUris = lastRegions.map((r) => r?.metadata?.uri).filter(Boolean);
+            const resp = await J('/global/clusters', { uris: allUris }, 'POST', true);
+            const gmap = Object.create(null);
+            (resp.groups || []).forEach((g) => (g.uris || []).forEach((u) => (gmap[u] = g.id)));
+            drawCollage(lastRegions, gmap);
+            return;
+            } catch (err) { console.warn('arrangeBy cluster fetch', err); }
+        }
+        drawCollage(lastRegions);
+      });
+
+      // When Share Relationships is off, disable per-predicate checkboxes
+      function updateSharePredsState() {
+        const box = document.getElementById('sharePredsBox');
+        const dis = !(clusterLinkProp?.checked);
+        [shareNear, shareContains, shareSame].forEach((el)=>{ if (el) el.disabled = dis; });
+        if (box) { box.style.opacity = dis ? '0.5' : '1.0'; box.style.pointerEvents = dis ? 'none' : 'auto'; }
+      }
+      clusterLinkProp?.addEventListener('change', updateSharePredsState);
+      updateSharePredsState();
+
+      // --- Manual URI autosuggest (like viewer) ---
+      (function setupManualSuggest(){
+        const inputEl = document.getElementById('uriManualGlobal');
+        if (!inputEl) return;
+        const box = document.createElement('div');
+        box.className = 'autosuggest-box';
+        box.style.position = 'absolute';
+        box.style.zIndex = 3000;
+        document.body.appendChild(box);
+        let items = [];
+        let idx = -1;
+        const hide = () => { box.style.display='none'; box.innerHTML=''; idx=-1; };
+        const place = () => { const r = inputEl.getBoundingClientRect(); box.style.left=r.left+'px'; box.style.top=r.bottom + window.scrollY+'px'; box.style.width=Math.max(r.width,480)+'px'; };
+        const escapeHtml = (s) => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;','\'':'&#39;'}[c]));
+        const render = () => {
+          box.innerHTML='';
+          items.forEach((it,i)=>{
+            const row = document.createElement('div');
+            row.className = 'as-row' + (it.deleted ? ' deleted' : '');
+            row.onmouseenter = () => { idx=i; highlight(); };
+            row.onclick = (e) => { e.preventDefault(); choose(it); };
+            row.onmousedown = row.onclick;
+            row.title = `${it.label} · ${it.uri}`;
+            row.innerHTML = `<div class="line"><strong class="label">${escapeHtml(it.label)}</strong> <span class="id">[${escapeHtml(it.id)}]${it.deleted ? ' · (deleted)' : ''}</span></div><div class="line uri">${escapeHtml(it.uri)}</div>`;
+            box.appendChild(row);
+          });
+          place();
+          box.style.display = items.length ? 'block' : 'none';
+          highlight();
+        };
+        const highlight = () => { [...box.children].forEach((c,j)=> c.style.background = j===idx ? 'var(--as-hl)' : 'transparent'); };
+        const choose = ({uri}) => { inputEl.value = uri; hide(); maybeOpenFor(uri); inputEl.blur(); };
+        const getCandidates = () => {
+          const out = [];
+          (lastRegions || []).forEach((r)=>{
+            const uri = r?.metadata?.uri || '';
+            if (!uri) return;
+            const lastSeg = String(uri).split('/').pop() || String(r.id);
+            const label = humanLabel(r);
+            out.push({ uri, label, id: lastSeg, r, deleted: !!(r?.metadata?.deleted) });
+          });
+          // Include merged-from audit URIs when Share Deleted enabled
+          if (showDeleted?.checked && Array.isArray(mergedSourceItems) && mergedSourceItems.length) {
+            // Don't duplicate any already present
+            const seen = new Set(out.map((x)=>x.uri));
+            mergedSourceItems.forEach((m)=>{ if (!seen.has(m.uri)) out.push(m); });
+          }
+          if (showDeleted?.checked && Array.isArray(deletedRegionItems) && deletedRegionItems.length) {
+            const seen2 = new Set(out.map((x)=>x.uri));
+            deletedRegionItems.forEach((m)=>{ if (!seen2.has(m.uri)) out.push(m); });
+          }
+          return out;
+        };
+        const update = () => {
+          const qRaw = inputEl.value.trim();
+          const q = qRaw.toLowerCase();
+          const all = getCandidates();
+          const isNum = /^\d+$/.test(qRaw);
+          const filtered = q ? all.filter((x)=>{
+            const id = String(x.id).toLowerCase();
+            const uriL = x.uri.toLowerCase();
+            const labelL = (x.label||'').toLowerCase();
+            const lastSeg = x.uri.split('/').pop()?.toLowerCase() || '';
+            if (isNum) {
+              const idNum=(id.match(/(\d+)/)||[])[1]||'';
+              return id===q || idNum===qRaw || lastSeg===q || lastSeg.endsWith(q);
+            }
+            return uriL.includes(q) || labelL.includes(q) || id.includes(q);
+          }) : all;
+          const score = (x) => {
+            if (!q) return 999;
+            const id = String(x.id).toLowerCase();
+            const lastSeg = String(x.uri).split('/').pop()?.toLowerCase() || '';
+            if (id===q) return 0;
+            if (lastSeg===q) return 0.5;
+            if (isNum) { const num=(id.match(/(\d+)/)||[])[1]||''; if (num===qRaw) return 1; if (num.endsWith(qRaw)) return 2; }
+            if (x.uri.toLowerCase().endsWith('/'+q)) return 3;
+            if (id.includes(q)) return 4;
+            if (x.uri.toLowerCase().includes(q)) return 5;
+            return 8;
+          };
+          items = filtered.sort((a,b)=>score(a)-score(b)).slice(0,12);
+          idx = items.length ? 0 : -1;
+          render();
+        };
+        inputEl.addEventListener('focus', update);
+        inputEl.addEventListener('input', update);
+        inputEl.addEventListener('keydown', (e)=>{
+          if (box.style.display !== 'block') return;
+          if (e.key==='ArrowDown') { e.preventDefault(); idx=Math.min(idx+1, items.length-1); highlight(); }
+          else if (e.key==='ArrowUp') { e.preventDefault(); idx=Math.max(idx-1, 0); highlight(); }
+
+          else if (e.key==='Enter') { if (idx>=0) { e.preventDefault(); choose(items[idx]); } }
+          else if (e.key==='Escape') hide();
+        });
+        inputEl.addEventListener('blur', ()=> setTimeout(hide,120));
+        window.addEventListener('scroll', ()=> box.style.display==='block' && place());
+        window.addEventListener('resize', ()=> box.style.display==='block' && place());
+      })();
+
+      // Build merged-from suggestions pool using SPARQL
+      async function refreshMergedSources() {
+        try {
+          const q = 'PREFIX ex:<http://example.org/> SELECT ?src ?target WHERE { ?target ex:mergedFrom ?src } LIMIT 5000';
+          const resp = await J('/global/sparql', q, 'POST');
+          const arr = Array.isArray(resp) ? resp : [];
+          mergedSourceItems = arr.map((row)=>{
+            const src = row.src || row['?src'];
+            const tgt = row.target || row['?target'];
+            const id = (String(src||'').split('/').pop()) || '';
+            return { uri: src, id, label: 'merged-from', r: { metadata: { uri: tgt } }, deleted: true };
+          });
+        } catch {
+          mergedSourceItems = [];
+        }
+      }
+
+      // Build deleted-region suggestions pool (owl:deprecated true)
+      async function refreshDeletedRegions() {
+        try {
+          const q = 'PREFIX owl:<http://www.w3.org/2002/07/owl#> PREFIX xsd:<http://www.w3.org/2001/XMLSchema#> SELECT ?r ?v WHERE { ?r owl:deprecated ?v . FILTER(?v = true || LCASE(STR(?v)) = "true") } LIMIT 5000';
+          const resp = await J('/global/sparql', q, 'POST');
+          const arr = Array.isArray(resp) ? resp : [];
+          deletedRegionItems = arr.map((row)=>{
+            const uri = row.r || row['?r'];
+            const id = (String(uri||'').split('/').pop()) || '';
+            return { uri, id, label: 'deleted', deleted: true };
+          });
+        } catch {
+          deletedRegionItems = [];
+        }
+      }
+    </script>
+  </body>
+  </html>
